@@ -26,9 +26,8 @@ NTSTATUS Register(CommCallbackProc callback)
 {
 	analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 	uint64_t address = ntos.GetPointer("NtConvertBetweenAuxiliaryCounterAndPerformanceCounter");
-
 	if (address == 0) {
-		LOG_INFO("invaild address\n");
+		LOG_INFO("invaild address");
 		return STATUS_UNSUCCESSFUL;
 	}
 

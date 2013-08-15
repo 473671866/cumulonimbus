@@ -8,7 +8,7 @@ namespace utils
 
 	NTSTATUS LookupProcessByImageName(std::wstring image_name, PEPROCESS* p);
 
-	uint64_t GetKernelModule(std::string module_name, size_t* size);
+	void* GetKernelModule(std::string module_name, size_t* size);
 
 	uint64_t GetSectionAddress(uint64_t image_base, std::string section_name, size_t* size);
 

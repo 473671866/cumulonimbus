@@ -4,14 +4,14 @@
 #include "sope_exit.hpp"
 
 int main(int arg, char** argv) {
-	if (arg < 2) {
+	if (arg < 3) {
 		return -1;
 	}
 
 	//读
 	std::filesystem::path file_path(argv[1]);
 	if (!std::filesystem::exists(file_path)) {
-		std::cout << "文件不存在\n";
+		std::cerr << "文件不存在\n";
 		system("pause");
 		return -2;
 	}
@@ -19,7 +19,7 @@ int main(int arg, char** argv) {
 	std::ifstream istream(file_path, std::ios::binary);
 	auto istream_close = std::experimental::make_scope_exit([&]() { istream.close(); });
 	if (istream.is_open() == false) {
-		std::cout << "打开文件失败\n";
+		std::cerr << "打开文件失败\n";
 		system("pause");
 		return -3;
 	}
@@ -29,17 +29,19 @@ int main(int arg, char** argv) {
 	auto delete_buffer = std::experimental::make_scope_exit([&]() { delete[] filebuffer; });
 	istream.read((char*)filebuffer, filesize);
 	if (istream.fail()) {
-		std::cout << "读取文件失败\n";
+		std::cerr << "读取文件失败\n";
 		system("pause");
 		return -4;
 	}
 
 	//写
 	file_path.replace_extension(".hpp");
-	std::ofstream ostream(file_path, std::ios::binary);
+	std::filesystem::path source(argv[2]);
+	source = source / file_path.filename();
+	std::ofstream ostream(source, std::ios::binary);
 	auto ostream_close = std::experimental::make_scope_exit([&]() { ostream.close(); });
 	if (!ostream.is_open()) {
-		std::cout << "创建文件失败\n";
+		std::cerr << "创建文件失败\n";
 		system("pause");
 		return -5;
 	}

@@ -63,55 +63,46 @@ namespace utils
 		return status;
 	}
 
-	uint64_t GetKernelModule(std::string module_name, size_t* size)
+	void* GetKernelModule(std::string module_name, size_t* size)
 	{
-		RTL_PROCESS_MODULES process_modules;
-		ULONG result = NULL;
-		uint64_t base = 0;
+		PRTL_PROCESS_MODULES modules = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag(PagedPool, sizeof(RTL_PROCESS_MODULES), 'size');
+		auto free_memory = make_scope_exit([modules] {	ExFreePoolWithTag(modules, 'size'); });
+		ULONG length = 0;
+		void* result = 0;
 
-		//查询模块
-		NTSTATUS status = ZwQuerySystemInformation(SystemModuleInformation, &process_modules, sizeof(RTL_PROCESS_MODULES), &result);
-
-		//缓冲区长度太小
+		NTSTATUS status = ZwQuerySystemInformation(SystemModuleInformation, modules, sizeof(RTL_PROCESS_MODULES), &length);
 		if (status == STATUS_INFO_LENGTH_MISMATCH) {
-			//申请长度
-			ULONG length = result + sizeof(RTL_PROCESS_MODULES);
-			PRTL_PROCESS_MODULES process_module = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag(PagedPool, length, 'size');
-			if (!process_module) {
-				return 0;
+			ExFreePoolWithTag(modules, 'size');
+			modules = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag(PagedPool, length + sizeof(RTL_PROCESS_MODULES), 'size');
+			RtlZeroMemory(modules, length);
+		}
+
+		status = ZwQuerySystemInformation(SystemModuleInformation, modules, length + sizeof(RTL_PROCESS_MODULES), &length);
+		if (!NT_SUCCESS(status)) {
+			return 0;
+		}
+
+		if (_stricmp(module_name.c_str(), "ntkrnlpa.exe") == 0 || _stricmp(module_name.c_str(), "ntoskrnl.exe") == 0) {
+			PRTL_PROCESS_MODULE_INFORMATION module_information = &(modules->Modules[0]);
+			result = module_information->ImageBase;
+			if (size) {
+				*size = module_information->ImageSize;
 			}
+			return result;
+		}
 
-			RtlZeroMemory(process_module, length);
-			auto free_memory = make_scope_exit([process_module] {	ExFreePoolWithTag(process_module, 'size'); });
-
-			//第二次查询
-			status = ZwQuerySystemInformation(SystemModuleInformation, process_module, length, &result);
-			if (!NT_SUCCESS(status)) {
-				return 0;
-			}
-
-			//ntoskrnl直接返回第一个
-			if (_stricmp(module_name.c_str(), "ntkrnlpa.exe") == 0 || _stricmp(module_name.c_str(), "ntoskrnl.exe") == 0) {
-				PRTL_PROCESS_MODULE_INFORMATION ModuleInfo = &(process_module->Modules[0]);
+		//遍历模块
+		for (size_t i = 0; i < modules->NumberOfModules; i++) {
+			PRTL_PROCESS_MODULE_INFORMATION module_information = &modules->Modules[i];
+			if (_stricmp((PCHAR)module_information->FullPathName, module_name.c_str())) {
+				result = module_information->ImageBase;
 				if (size) {
-					*size = ModuleInfo->ImageSize;
+					*size = module_information->ImageSize;
 				}
-				base = (uint64_t)ModuleInfo->ImageBase;
-				return base;
-			}
-			//遍历模块
-			for (size_t i = 0; i < process_module->NumberOfModules; i++) {
-				PRTL_PROCESS_MODULE_INFORMATION processModule = &process_module->Modules[i];
-				if (_stricmp((PCHAR)processModule->FullPathName, module_name.c_str())) {
-					base = (ULONG_PTR)processModule->ImageBase;
-					if (size) {
-						*size = processModule->ImageSize;
-					}
-					break;
-				}
+				return result;
 			}
 		}
-		return base;
+		return result;
 	}
 
 	uint64_t GetSectionAddress(uint64_t image_base, std::string section_name, size_t* size)

@@ -21,6 +21,18 @@
     <ClInclude Include="api.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="loader.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="spoce_exit.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="load.hpp">
+      <Filter>资源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="driver.hpp">
+      <Filter>资源文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="comm.cpp">
@@ -30,6 +42,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="loader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
