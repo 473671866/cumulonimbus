@@ -2,15 +2,9 @@
 #include "utils/utils.h"
 #include "comm.h"
 #include "call.h"
-#include "pdb/oxygenPdb.h"
-#pragma warning(disable:4996)
-#pragma warning(disable:4838)
-#pragma warning(disable:4309)
-#pragma warning(disable:4311)
-#pragma warning(disable:4302)
+
 //TODO:
 //¶ÁÐ´
-//call
 //×¢Èë
 //ÄÚ´æ
 //Ä£¿éhook
@@ -47,12 +41,12 @@ EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 	constexpr wchar_t log_file_path[] = L"\\SystemRoot\\cumulonimbus.log";
 	auto status = LogInitialization(log_level, log_file_path);
 
-	if (driver_object != nullptr) {
-		driver_object->DriverUnload = DriverUnload;
-	}
-
 	if (!NT_SUCCESS(status)) {
 		return status;
+	}
+
+	if (driver_object != nullptr) {
+		driver_object->DriverUnload = DriverUnload;
 	}
 
 	return Register(Controller);
