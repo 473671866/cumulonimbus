@@ -181,6 +181,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="call.cpp" />
     <ClCompile Include="comm.cpp" />
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="hde\hde32.cpp" />
@@ -198,6 +199,7 @@
     <ClCompile Include="utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="call.h" />
     <ClInclude Include="comm.h" />
     <ClInclude Include="hde\hde.h" />
     <ClInclude Include="hde\hde32.h" />

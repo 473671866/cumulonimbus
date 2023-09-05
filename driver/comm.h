@@ -4,6 +4,7 @@
 enum class  Command : uint64_t
 {
 	Link = 555,
+	Call,
 };
 
 struct CommPackage
@@ -13,6 +14,13 @@ struct CommPackage
 	uint64_t buffer;
 	uint64_t length;
 	int64_t result;
+};
+
+struct RemoteCallPackage
+{
+	uint64_t pid;
+	uint64_t shellcode;
+	uint64_t size;
 };
 
 typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);

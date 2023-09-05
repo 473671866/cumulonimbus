@@ -61,6 +61,9 @@
     <ClCompile Include="utils\utils.cpp">
       <Filter>utils</Filter>
     </ClCompile>
+    <ClCompile Include="call.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils\hook.hpp">
@@ -136,6 +139,9 @@
       <Filter>pdb</Filter>
     </ClInclude>
     <ClInclude Include="comm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="call.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

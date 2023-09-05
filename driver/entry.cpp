@@ -1,5 +1,13 @@
 #include "standard/base.h"
+#include "utils/utils.h"
 #include "comm.h"
+#include "call.h"
+#include "pdb/oxygenPdb.h"
+#pragma warning(disable:4996)
+#pragma warning(disable:4838)
+#pragma warning(disable:4309)
+#pragma warning(disable:4311)
+#pragma warning(disable:4302)
 //TODO:
 //¶ÁÐ´
 //call
@@ -12,8 +20,13 @@ NTSTATUS Controller(CommPackage* package)
 	switch (package->command) {
 	case Command::Link: {
 		*(uint64_t*)package->buffer = 0x77777;
-		LOG_INFO("link success\n");
+		LOG_INFO("link success");
 		break;
+	}
+	case Command::Call: {
+		LOG_INFO("remote call");
+		RemoteCallPackage* data = reinterpret_cast<RemoteCallPackage*>(package->buffer);
+		return RemoteCall((HANDLE)data->pid, (void*)data->shellcode, data->size);
 	}
 	default:
 		break;
