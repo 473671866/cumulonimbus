@@ -1,5 +1,6 @@
 #include "call.h"
 #include "pdb/oxygenPdb.h"
+#include "utils/memory.hpp"
 
 //0x70 bytes (sizeof)
 typedef struct _FLOATING_SAVE_AREA
@@ -231,6 +232,12 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	PVOID user_buffer = 0;
 	SIZE_T region_size = size + PAGE_SIZE;
 	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &user_buffer, 0, &region_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	//Òþ²ØÄÚ´æ
+	status = MemoryUtils().HideMemory(user_buffer);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}

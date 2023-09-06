@@ -117,14 +117,16 @@ public:
 		NOTHING;
 	}
 
-	template<typename _VA> NTSTATUS HideMemory(HANDLE pid, _VA temp)
+	template<typename _VA> NTSTATUS HideMemory(_VA temp)
 	{
+		//参数校验
 		void* virtual_address = (void*)temp;
-		if (pid == 0 || virtual_address == 0) {
+		if (virtual_address == 0) {
 			LOG_WARN("invalid pid or address");
 			return STATUS_INVALID_ADDRESS;
 		}
 
+		//获取MmGetVirtualForPhysical
 		UNICODE_STRING name{};
 		RtlInitUnicodeString(&name, L"MmGetVirtualForPhysical");
 		uint8_t* address = static_cast<uint8_t*>(MmGetSystemRoutineAddress(&name));
@@ -133,6 +135,7 @@ public:
 			return STATUS_UNSUCCESSFUL;
 		}
 
+		//获取mmpfndatabase
 		MMPFN* pfnbase = 0;
 		for (int i = 0; address[i] != 0xc3; i++) {
 			if (address[i] == 0x48 && address[i + 1] == 0xb8 && address[i + 2] == 0x08) {
@@ -146,6 +149,47 @@ public:
 			return STATUS_UNSUCCESSFUL;
 		}
 
+		//修改原始pte
+		LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx", pfnbase, virtual_address);
+		uint64_t pfn = MmGetPhysicalAddress(PAGE_ALIGN(virtual_address)).QuadPart >> 12;
+		pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
+
+		return STATUS_SUCCESS;
+	}
+
+	template<typename _VA> NTSTATUS HideMemory(HANDLE pid, _VA temp)
+	{
+		//参数校验
+		void* virtual_address = (void*)temp;
+		if (pid == 0 || virtual_address == 0) {
+			LOG_WARN("invalid pid or address");
+			return STATUS_INVALID_ADDRESS;
+		}
+
+		//获取MmGetVirtualForPhysical
+		UNICODE_STRING name{};
+		RtlInitUnicodeString(&name, L"MmGetVirtualForPhysical");
+		uint8_t* address = static_cast<uint8_t*>(MmGetSystemRoutineAddress(&name));
+		if (address == 0) {
+			LOG_WARN("get MmGetVirtualForPhysical failed");
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		//获取mmpfndatabase
+		MMPFN* pfnbase = 0;
+		for (int i = 0; address[i] != 0xc3; i++) {
+			if (address[i] == 0x48 && address[i + 1] == 0xb8 && address[i + 2] == 0x08) {
+				pfnbase = reinterpret_cast<MMPFN*>(((*reinterpret_cast<uint64_t*>(address + i + 2)) - 8));
+				break;
+			}
+		}
+
+		if (pfnbase == 0) {
+			LOG_WARN("get MmPfnDataBase failed");
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		//获取进程
 		PEPROCESS process = nullptr;
 		auto status = PsLookupProcessByProcessId(pid, &process);
 		if (!NT_SUCCESS(status)) {
@@ -153,9 +197,17 @@ public:
 			return status;
 		}
 
+		if (PsGetProcessExitStatus(process) == 0x103) {
+			LOG_WARN("process is termination");
+			ObDereferenceObject(process);
+			return STATUS_PROCESS_IS_TERMINATING;
+		}
+
+		//附加
 		KAPC_STATE apc{};
 		KeStackAttachProcess(process, &apc);
 
+		//修改原始pte
 		LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx", pfnbase, virtual_address);
 		uint64_t pfn = MmGetPhysicalAddress(PAGE_ALIGN(virtual_address)).QuadPart >> 12;
 		pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;

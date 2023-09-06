@@ -5,7 +5,6 @@
 #include "call.h"
 
 //TODO:
-//ÄÚ´æ
 //¶ÁÐ´
 //×¢Èë
 //Ä£¿éhook
