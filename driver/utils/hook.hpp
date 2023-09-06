@@ -131,23 +131,19 @@ public:
 			temp += hde.len;
 		}
 
-#pragma warning(push)
-#pragma warning(disable:4838)
-#pragma warning(disable:4309)
 		//trampline
-		char recover[14]{ 0xff, 0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		uint8_t recover[14]{ 0xff, 0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 		*(uint64_t*)&recover[6] = (uint64_t)temp;
 		RtlCopyMemory(record->srcbyte, (char*)address, length);
 		RtlCopyMemory(trampline, record->srcbyte, length);
 		RtlCopyMemory(trampline + length, recover, sizeof(recover));
 
 		//hook
-		char forword[14]{ 0xff, 0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		uint8_t forword[14]{ 0xff, 0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 		*(uint64_t*)&forword[6] = (uint64_t)handler;
 		RtlCopyMemory(p, forword, sizeof(forword));
-#pragma warning(pop)
 
-		* (void**)original = trampline;
+		*(void**)original = trampline;
 		record->bytesize = length;
 		record->forword = reinterpret_cast<uint64_t>(trampline);
 		record->recover = reinterpret_cast<uint64_t>(temp);
@@ -214,16 +210,16 @@ private:
 	NPAGED_LOOKASIDE_LIST	m_lookaside;
 };
 
-class PteHook : public Singleton<PteHook>
+class PageTableHook : public Singleton<PageTableHook>
 {
 public:
-	PteHook()
+	PageTableHook()
 	{
 		KeInitializeSpinLock(&this->m_spin_lock);
 		ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(PteHookRecord), HOOK_FLAG, NULL);
 	}
 
-	~PteHook()
+	~PageTableHook()
 	{
 		ExDeleteNPagedLookasideList(&this->m_lookaside);
 	}
@@ -244,60 +240,60 @@ public:
 		}
 
 		//获取页表
-		MemUtils mem;
+		PageTableUtils page_table;
 
-		pt_entry_64* new_pdpt = mem.CreatePageTable();
+		pt_entry_64* new_pdpt = page_table.CreatePageTable();
 		if (new_pdpt == nullptr) {
 			ExFreeToNPagedLookasideList(&this->m_lookaside, record);
 			return false;
 		}
 
-		pt_entry_64* new_pd = mem.CreatePageTable();
+		pt_entry_64* new_pd = page_table.CreatePageTable();
 		if (new_pd == nullptr) {
 			ExFreeToNPagedLookasideList(&this->m_lookaside, record);
-			mem.FreePageTable(new_pdpt);
+			page_table.FreePageTable(new_pdpt);
 			return false;
 		}
 
-		pt_entry_64* new_pt = mem.CreatePageTable();
+		pt_entry_64* new_pt = page_table.CreatePageTable();
 		if (new_pt == nullptr) {
 			ExFreeToNPagedLookasideList(&this->m_lookaside, record);
-			mem.FreePageTable(new_pdpt);
-			mem.FreePageTable(new_pd);
+			page_table.FreePageTable(new_pdpt);
+			page_table.FreePageTable(new_pd);
 			return false;
 		}
 
-		void* hook_page = mem.CreatePageTable();
+		void* hook_page = page_table.CreatePageTable();
 		if (hook_page == nullptr) {
 			ExFreeToNPagedLookasideList(&this->m_lookaside, record);
-			mem.FreePageTable(new_pdpt);
-			mem.FreePageTable(new_pd);
-			mem.FreePageTable(new_pt);
+			page_table.FreePageTable(new_pdpt);
+			page_table.FreePageTable(new_pd);
+			page_table.FreePageTable(new_pt);
 			return false;
 		}
 
 		//复制pdpte
-		pml4e_64* pml4e = mem.GetPml4eAddress(address);
-		pt_entry_64* pdpt = mem.GetPageTable(pml4e->page_frame_number);
-		mem.CopyPageTable(new_pdpt, pdpt);
+		pml4e_64* pml4e = page_table.GetPml4eAddress(address);
+		pt_entry_64* pdpt = page_table.GetPageTable(pml4e->page_frame_number);
+		page_table.CopyPageTable(new_pdpt, pdpt);
 
 		//复制pde
-		pdpte_64* pdpte = mem.GetPdpteAddress(address);
-		pt_entry_64* pd = mem.GetPageTable(pdpte->page_frame_number);
-		mem.CopyPageTable(new_pd, pd);
+		pdpte_64* pdpte = page_table.GetPdpteAddress(address);
+		pt_entry_64* pd = page_table.GetPageTable(pdpte->page_frame_number);
+		page_table.CopyPageTable(new_pd, pd);
 
 		//复制pte
-		pde_64* pde = mem.GetPdeAddress(address);
+		pde_64* pde = page_table.GetPdeAddress(address);
 		pt_entry_64* pt = nullptr;
 		if (pde->present == true) {
 			if (pde->large_page == true) {
 				//大页
-				mem.SplitLargePage(pde, new_pt);
+				page_table.SplitLargePage(pde, new_pt);
 			}
 			else {
 				//小页
-				pt = mem.GetPageTable(pde->page_frame_number);
-				mem.CopyPageTable(new_pt, pt);
+				pt = page_table.GetPageTable(pde->page_frame_number);
+				page_table.CopyPageTable(new_pt, pt);
 			}
 		}
 
@@ -340,20 +336,27 @@ public:
 		record->process = PsGetCurrentProcess();
 		this->m_record_list.push_back(record);
 
-		uint64_t new_pdpt_pfn = mem.GetPageNumber(new_pdpt);
-		uint64_t new_pd_pfn = mem.GetPageNumber(new_pd);
-		uint64_t new_pt_pfn = mem.GetPageNumber(new_pt);
-		uint64_t new_page_pfn = mem.GetPageNumber(hook_page);
+		uint64_t new_pdpt_pfn = page_table.GetPageNumber(new_pdpt);
+		uint64_t new_pd_pfn = page_table.GetPageNumber(new_pd);
+		uint64_t new_pt_pfn = page_table.GetPageNumber(new_pt);
+		uint64_t new_page_pfn = page_table.GetPageNumber(hook_page);
 
 		KIRQL irql{};
 		KeAcquireSpinLock(&this->m_spin_lock, &irql);
 
 		VirtualAddressHelper helper{ .flags = address };
+
 		pml4e->page_frame_number = new_pdpt_pfn;
+
 		new_pdpt[helper.pdpte].page_frame_number = new_pd_pfn;
+
 		new_pd[helper.pde].page_frame_number = new_pt_pfn;
 		new_pd[helper.pde].large_page = 0;
+		new_pd[helper.pde].global = 0;
+
 		new_pt[helper.pte].page_frame_number = new_page_pfn;
+		new_pd[helper.pte].global = 0;
+
 		__invlpg(pml4e);
 
 		KeReleaseSpinLock(&this->m_spin_lock, irql);
@@ -374,8 +377,8 @@ public:
 		KAPC_STATE apc{};
 		KeStackAttachProcess(record->process, &apc);
 
-		MemUtils mem;
-		pml4e_64* pml4e = mem.GetPml4eAddress(record->address);
+		PageTableUtils page_table;
+		pml4e_64* pml4e = page_table.GetPml4eAddress(record->address);
 		uint64_t pfn = record->pml4e_page_number;
 
 		KIRQL irql{};
@@ -387,10 +390,10 @@ public:
 		KeReleaseSpinLock(&this->m_spin_lock, irql);
 		KeUnstackDetachProcess(&apc);
 
-		mem.FreePageTable(record->pdpt);
-		mem.FreePageTable(record->pd);
-		mem.FreePageTable(record->pt);
-		mem.FreePageTable(record->page);
+		page_table.FreePageTable(record->pdpt);
+		page_table.FreePageTable(record->pd);
+		page_table.FreePageTable(record->pt);
+		page_table.FreePageTable(record->page);
 		delete[] record->trampline;
 		record->trampline = nullptr;
 		ExFreeToNPagedLookasideList(&this->m_lookaside, record);

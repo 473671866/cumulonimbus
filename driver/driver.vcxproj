@@ -164,8 +164,8 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Netio.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>./capstone/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Netio.lib;capstone_static_winkernel.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -200,6 +200,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="call.h" />
+    <ClInclude Include="capstone\arm.h" />
+    <ClInclude Include="capstone\arm64.h" />
+    <ClInclude Include="capstone\capstone.h" />
+    <ClInclude Include="capstone\mips.h" />
+    <ClInclude Include="capstone\platform.h" />
+    <ClInclude Include="capstone\ppc.h" />
+    <ClInclude Include="capstone\sparc.h" />
+    <ClInclude Include="capstone\systemz.h" />
+    <ClInclude Include="capstone\x86.h" />
+    <ClInclude Include="capstone\xcore.h" />
     <ClInclude Include="comm.h" />
     <ClInclude Include="hde\hde.h" />
     <ClInclude Include="hde\hde32.h" />
@@ -242,10 +252,12 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="capstone\capstone_static_winkernel.pdb" />
     <None Include="hde\LICENSE" />
     <None Include="pdb\oxygenpdb.pdb" />
   </ItemGroup>
   <ItemGroup>
+    <Library Include="capstone\capstone_static_winkernel.lib" />
     <Library Include="pdb\oxygenpdb.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,22 +1,18 @@
 #pragma once
 #include "../Standard/base.h"
+#include "../pdb/oxygenPdb.h"
 
-class MemUtils
+class PageTableUtils
 {
 public:
-	MemUtils()
+	PageTableUtils()
 	{
 		cr3 system_cr3{ .flags = __readcr3() };
-		uint64_t cr3_phyiscal_address = system_cr3.address_of_page_directory << 12;
-
-		PHYSICAL_ADDRESS physical_address{  };
-		physical_address.QuadPart = cr3_phyiscal_address;
+		PHYSICAL_ADDRESS physical_address{ .QuadPart = static_cast<LONGLONG>(system_cr3.address_of_page_directory << 12) };
 		pt_entry_64* pml4t = reinterpret_cast<pt_entry_64*>(MmGetVirtualForPhysical(physical_address));
 
-		for (uint64_t i = 0; i < PML4E_ENTRY_COUNT_64; i++)
-		{
-			if (pml4t[i].page_frame_number == system_cr3.address_of_page_directory)
-			{
+		for (uint64_t i = 0; i < PML4E_ENTRY_COUNT_64; i++) {
+			if (pml4t[i].page_frame_number == system_cr3.address_of_page_directory) {
 				m_pte_base = (i + 0x1FFFE00ui64) << 39ui64;
 				m_pde_base = (i << 30ui64) + m_pte_base;
 				m_ppe_base = (i << 30ui64) + m_pte_base + (i << 21ui64);
@@ -67,8 +63,7 @@ public:
 
 	pt_entry_64* GetPageTable(uint64_t page_number)
 	{
-		PHYSICAL_ADDRESS physical_address{  };
-		physical_address.QuadPart = page_number << 12;
+		PHYSICAL_ADDRESS physical_address{ .QuadPart = static_cast<LONGLONG>(page_number << 12) };
 		return reinterpret_cast<pt_entry_64*>(MmGetVirtualForPhysical(physical_address));
 	}
 
@@ -107,4 +102,76 @@ private:
 	uint64_t m_pde_base;
 	uint64_t m_ppe_base;
 	uint64_t m_pxe_base;
+};
+
+class MemoryUtils
+{
+public:
+	MemoryUtils()
+	{
+		NOTHING;
+	}
+
+	~MemoryUtils()
+	{
+		NOTHING;
+	}
+
+	template<typename _VA> NTSTATUS HideMemory(HANDLE pid, _VA temp)
+	{
+		void* virtual_address = (void*)temp;
+		if (pid == 0 || virtual_address == 0) {
+			LOG_WARN("invalid pid or address");
+			return STATUS_INVALID_ADDRESS;
+		}
+
+		UNICODE_STRING name{};
+		RtlInitUnicodeString(&name, L"MmGetVirtualForPhysical");
+		uint8_t* address = static_cast<uint8_t*>(MmGetSystemRoutineAddress(&name));
+		if (address == 0) {
+			LOG_WARN("get MmGetVirtualForPhysical failed");
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		MMPFN* pfnbase = 0;
+		for (int i = 0; address[i] != 0xc3; i++) {
+			if (address[i] == 0x48 && address[i + 1] == 0xb8 && address[i + 2] == 0x08) {
+				pfnbase = reinterpret_cast<MMPFN*>(((*reinterpret_cast<uint64_t*>(address + i + 2)) - 8));
+				break;
+			}
+		}
+
+		if (pfnbase == 0) {
+			LOG_WARN("get MmPfnDataBase failed");
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		PEPROCESS process = nullptr;
+		auto status = PsLookupProcessByProcessId(pid, &process);
+		if (!NT_SUCCESS(status)) {
+			LOG_WARN("get PsLookupProcessByProcessId failed status: %llx", status);
+			return status;
+		}
+
+		KAPC_STATE apc{};
+		KeStackAttachProcess(process, &apc);
+
+		LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx", pfnbase, virtual_address);
+		uint64_t pfn = MmGetPhysicalAddress(PAGE_ALIGN(virtual_address)).QuadPart >> 12;
+		pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
+
+		KeUnstackDetachProcess(&apc);
+		ObDereferenceObject(process);
+		return status;
+	}
+
+	NTSTATUS ReadMemory()
+	{
+		NOTHING;
+	}
+
+	NTSTATUS WriteMemory()
+	{
+		NOTHING;
+	}
 };

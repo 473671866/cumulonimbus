@@ -208,8 +208,6 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 #pragma warning (push)
 #pragma warning(disable:4996)
-#pragma warning(disable:4838)
-#pragma warning(disable:4309)
 #pragma warning(disable:4311)
 #pragma warning(disable:4302)
 
@@ -245,7 +243,7 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	//x86
 	PVOID wow64 = PsGetProcessWow64Process(process);
 	if (wow64) {
-		char x86_buffer[]
+		uint8_t x86_buffer[]
 		{
 			0x60,									//60              pushad
 			0xB8, 0x78, 0x56, 0x34, 0x12,			//B8 78563412     mov eax,12345678
@@ -263,60 +261,60 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 		};
 		char* teb = reinterpret_cast<char*>(PsGetThreadTeb(thread));
 		CONTEXT_x86* context = reinterpret_cast<CONTEXT_x86*>(((char*)*(uint64_t*)(teb + 0x1488) + 4));	//wow64 context
-		*(PULONG)&x86_buffer[2] = (uint32_t)shell_code_buffer;											//shellcode
-		*(PULONG)&x86_buffer[15] = ((uint32_t)user_buffer + 0x500);										//flags
-		*(PULONG)&x86_buffer[32] = context->Eip;														//ret
+		*(uint32_t*)&x86_buffer[2] = (uint32_t)shell_code_buffer;										//shellcode
+		*(uint32_t*)&x86_buffer[15] = ((uint32_t)user_buffer + 0x500);									//flags
+		*(uint32_t*)&x86_buffer[32] = context->Eip;														//ret
 		RtlCopyMemory(user_buffer, x86_buffer, sizeof(x86_buffer));										//注入
 		context->Eip = reinterpret_cast<uint32_t>(user_buffer);											//修改eip
 	}
 	else {
-		char x64_buffer[] =
+		uint8_t x64_buffer[] =
 		{
-			0x50,															//push  rax
-			0x51,															//push  rcx
-			0x52,															//push  rdx
-			0x53,															//push  rbx
-			0x55, 															//push  rbp
-			0x56, 															//push  rsi
-			0x57, 															//push  rdi
-			0x41, 0x50, 													//push  r8
-			0x41, 0x51, 													//push  r9
-			0x41, 0x52, 													//push  r10
-			0x41, 0x53, 													//push  r11
-			0x41, 0x54, 													//push  r12
-			0x41, 0x55, 													//push  r13
-			0x41, 0x56, 													//push  r14
-			0x41, 0x57, 													//push  r15
-			0x48, 0xB8, 0x99, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00,0x00, 		//mov  rax,0x0000012345678999
-			0x48, 0x81, 0xEC, 0xA0, 0x00, 0x00, 0x00, 						//sub  rsp,0x00000000000000A8
-			0xFF, 0xD0, 													//call  rax
-			0x48, 0x81, 0xC4, 0xA0, 0x00, 0x00, 0x00, 						//add  rsp,0x00000000000000A8
-			0x41, 0x5F, 													//pop  r15
-			0x41, 0x5E,														//pop  r14
-			0x41, 0x5D, 													//pop  r13
-			0x41, 0x5C, 													//pop  r12
-			0x41, 0x5B, 													//pop  r11
-			0x41, 0x5A, 													//pop  r10
-			0x41, 0x59, 													//pop  r9
-			0x41, 0x58, 													//pop  r8
-			0x5F, 															//pop  rdi
-			0x5E, 															//pop  rsi
-			0x5D, 															//pop  rbp
-			0x5B, 															//pop  rbx
-			0x5A,															//pop  rdx
-			0x59, 															//pop  rcx
-			0x48, 0xB8, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 	//mov  rax,0x0000000123456789
-			0x48, 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00, 0x58, 				//mov  qword ptr ds:[rax],0x0000000000000001
-			0xFF, 0x25, 0x00, 0x00, 0x00, 0x00,								//pop  rax
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00					//jmp  qword ptr ds : [PCHunter64.00000001403ABA27]
+			0x50,																				//push  rax
+			0x51,																				//push  rcx
+			0x52,																				//push  rdx
+			0x53,																				//push  rbx
+			0x55, 																				//push  rbp
+			0x56, 																				//push  rsi
+			0x57, 																				//push  rdi
+			0x41, 0x50, 																		//push  r8
+			0x41, 0x51, 																		//push  r9
+			0x41, 0x52, 																		//push  r10
+			0x41, 0x53, 																		//push  r11
+			0x41, 0x54, 																		//push  r12
+			0x41, 0x55, 																		//push  r13
+			0x41, 0x56, 																		//push  r14
+			0x41, 0x57, 																		//push  r15
+			0x48, 0xB8, 0x99, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00,0x00, 							//mov  rax,0x0000012345678999
+			0x48, 0x81, 0xEC, 0xA0, 0x00, 0x00, 0x00, 											//sub  rsp,0x00000000000000A8
+			0xFF, 0xD0, 																		//call  rax
+			0x48, 0x81, 0xC4, 0xA0, 0x00, 0x00, 0x00, 											//add  rsp,0x00000000000000A8
+			0x41, 0x5F, 																		//pop  r15
+			0x41, 0x5E,																			//pop  r14
+			0x41, 0x5D, 																		//pop  r13
+			0x41, 0x5C, 																		//pop  r12
+			0x41, 0x5B, 																		//pop  r11
+			0x41, 0x5A, 																		//pop  r10
+			0x41, 0x59, 																		//pop  r9
+			0x41, 0x58, 																		//pop  r8
+			0x5F, 																				//pop  rdi
+			0x5E, 																				//pop  rsi
+			0x5D, 																				//pop  rbp
+			0x5B, 																				//pop  rbx
+			0x5A,																				//pop  rdx
+			0x59, 																				//pop  rcx
+			0x48, 0xB8, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00,							//mov  rax,0x0000000123456789
+			0x48, 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00,											//mov  qword ptr ds:[rax],0x0000000000000001
+			0x58, 																				//pop  rax
+			0xFF, 0x25, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00	//jmp  qword ptr ds : [PCHunter64.00000001403ABA27]
 		};
 
 		PKTRAP_FRAME trap = *(PKTRAP_FRAME*)((char*)thread + GetTrapFrameOffset());		//线程
-		*(PULONG64)&x64_buffer[25] = (ULONG64)shell_code_buffer;						//shellcode
-		*(PULONG64)&x64_buffer[73] = (ULONG64)user_buffer + 0x500;						//falgs
-		*(PULONG64)&x64_buffer[95] = trap->Rip;											//ret
+		*(uint64_t*)&x64_buffer[25] = (uint64_t)shell_code_buffer;						//shellcode
+		*(uint64_t*)&x64_buffer[73] = (uint64_t)user_buffer + 0x500;					//falgs
+		*(uint64_t*)&x64_buffer[95] = trap->Rip;										//ret
 		RtlCopyMemory(user_buffer, x64_buffer, sizeof(x64_buffer));						//注入
-		trap->Rip = (ULONG64)user_buffer;												//修改rip
+		trap->Rip = (uint64_t)user_buffer;												//修改rip
 	}
 
 	//恢复线程

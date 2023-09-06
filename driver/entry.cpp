@@ -1,12 +1,13 @@
 #include "standard/base.h"
 #include "utils/utils.h"
+#include "utils/memory.hpp"
 #include "comm.h"
 #include "call.h"
 
 //TODO:
+//内存
 //读写
 //注入
-//内存
 //模块hook
 
 NTSTATUS Controller(CommPackage* package)

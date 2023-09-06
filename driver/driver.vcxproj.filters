@@ -29,6 +29,9 @@
     <Filter Include="pdb">
       <UniqueIdentifier>{e66d577f-ede8-4052-9f5a-13d485308545}</UniqueIdentifier>
     </Filter>
+    <Filter Include="capstone">
+      <UniqueIdentifier>{2fda5a5d-5d8f-4e90-b151-0470e2b829ac}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="standard\exit.cpp">
@@ -144,6 +147,36 @@
     <ClInclude Include="call.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="capstone\arm.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\arm64.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\capstone.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\mips.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\platform.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\ppc.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\sparc.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\systemz.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\x86.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
+    <ClInclude Include="capstone\xcore.h">
+      <Filter>capstone</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="hde\LICENSE">
@@ -152,10 +185,16 @@
     <None Include="pdb\oxygenpdb.pdb">
       <Filter>pdb</Filter>
     </None>
+    <None Include="capstone\capstone_static_winkernel.pdb">
+      <Filter>capstone</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="pdb\oxygenpdb.lib">
       <Filter>pdb</Filter>
+    </Library>
+    <Library Include="capstone\capstone_static_winkernel.lib">
+      <Filter>capstone</Filter>
     </Library>
   </ItemGroup>
 </Project>
