@@ -14,7 +14,7 @@ int main()
 	uint64_t msg = (uint64_t)GetProcAddress(hmodule, "MessageBoxA");
 	printf("msg: %llx\n", msg);
 
-	char buffer[]
+	uint8_t buffer[]
 	{
 		0x31, 0xC9,													//xor rcx, rcx
 		0x31, 0xD2,													//xor rdx, rdx
@@ -26,6 +26,7 @@ int main()
 		0x48, 0x81, 0xC4, 0xA8, 0x00, 0x00, 0x00,					//add rsp, 0xa8
 		0xC3														//ret
 	};
+	//0x7FFDE739A9C0
 
 	*(uint64_t*)&buffer[12] = msg;
 	RemoteCall(3692, buffer, sizeof(buffer));

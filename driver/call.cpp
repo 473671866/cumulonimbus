@@ -1,6 +1,8 @@
 #include "call.h"
 #include "pdb/oxygenPdb.h"
 #include "utils/memory.hpp"
+#include "utils/process.hpp"
+#include "utils/MemLoadDll.h"
 
 //0x70 bytes (sizeof)
 typedef struct _FLOATING_SAVE_AREA
@@ -140,24 +142,33 @@ VOID WorkerRoutine(
 {
 	FreeMemory* fm = reinterpret_cast<FreeMemory*>(Parameter);
 
+	//获取进程
 	PEPROCESS process = nullptr;
 	auto status = PsLookupProcessByProcessId(fm->pid, &process);
 	if (!NT_SUCCESS(status)) {
 		return;
 	}
-	auto dereference_process = make_scope_exit([process] {ObDereferenceObject(process); });
 
+	KAPC_STATE apc{};
+	KeStackAttachProcess(process, &apc);
+
+	//读取标记
 	uint64_t flags = 0;
-	size_t returned_bytes = 0;
 	boolean success = true;
 	int count = 0;
 
 	while (1) {
+		status = PsGetProcessExitStatus(process);
+		if (status != 0x103) {
+			break;
+		}
+
 		if (count > 10000) {
 			break;
 		}
-		status = MmCopyVirtualMemory(process, (PVOID)fm->flags, IoGetCurrentProcess(), &flags, 8, KernelMode, &returned_bytes);
-		if (NT_SUCCESS(status) && flags == 1) {
+
+		RtlCopyMemory(&flags, (void*)fm->flags, 8);
+		if (flags == 1) {
 			success = true;
 			break;
 		}
@@ -168,13 +179,13 @@ VOID WorkerRoutine(
 		count++;
 	}
 
+	//释放内存
 	if (success) {
-		KAPC_STATE apc{};
-		KeStackAttachProcess(process, &apc);
 		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&fm->base, &fm->size, MEM_RELEASE);
 		ExFreePool(fm);
-		KeUnstackDetachProcess(&apc);
 	}
+	KeUnstackDetachProcess(&apc);
+	ObDereferenceObject(process);
 	return;
 }
 
@@ -227,17 +238,12 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	//附加
 	KAPC_STATE apc{};
 	KeStackAttachProcess(process, &apc);
+	auto detach = make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
 
 	//申请r3内存
 	PVOID user_buffer = 0;
 	SIZE_T region_size = size + PAGE_SIZE;
 	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &user_buffer, 0, &region_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	if (!NT_SUCCESS(status)) {
-		return status;
-	}
-
-	//隐藏内存
-	status = MemoryUtils().HideMemory(user_buffer);
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -336,7 +342,205 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 		ExInitializeWorkItem(&fm->item, WorkerRoutine, fm);
 		ExQueueWorkItem(&fm->item, DelayedWorkQueue);
 	}
+	else {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &user_buffer, &region_size, MEM_RELEASE);
+	}
+
 #pragma warning(pop)
-	KeUnstackDetachProcess(&apc);
+	return status;
+}
+
+struct FreeMemoryEx
+{
+	WORK_QUEUE_ITEM item;
+	HANDLE pid;
+	void* library_file_buffer;
+	size_t library_file_buffer_size;
+	void* library_image_buffer;
+	size_t library_image_buffer_size;
+	void* shell_code_buffer;
+	size_t shell_code_buffer_size;
+	void* flags;
+};
+
+NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
+{
+	//获取进程
+	PEPROCESS process = nullptr;
+	auto status = PsLookupProcessByProcessId(pid, &process);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	//进程是否在运行
+	auto dereference_process = make_scope_exit([process] {ObDereferenceObject(process); });
+	status = PsGetProcessExitStatus(process);
+	if (status != 0x103) {
+		return STATUS_PROCESS_IS_TERMINATING;
+	}
+
+	//获取主线程
+	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
+	if (thread == nullptr) {
+		return STATUS_THREAD_IS_TERMINATING;
+	}
+
+	//挂起线程
+	auto dereference_thread = make_scope_exit([thread] {ObDereferenceObject(thread); });
+	status = PsSuspendThread(thread, nullptr);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	KAPC_STATE apc{};
+	KeStackAttachProcess(process, &apc);
+	auto detach = make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
+
+	//dll文件内存
+	void* library_file_buffer = 0;
+	size_t library_file_buffer_size = filesize;
+	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &library_file_buffer, 0, &library_file_buffer_size, MEM_COMMIT, PAGE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	//dll镜像内存
+	void* library_image_buffer = 0;
+	size_t library_image_buffer_size = imagesize;
+	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &library_image_buffer, 0, &library_image_buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
+		return status;
+	}
+
+	//shellcode内存
+	uint8_t* shell_code_buffer = nullptr;
+	size_t shell_code_buffer_size = sizeof(MemLoadShellcode_x64) + PAGE_SIZE;
+	status = ZwAllocateVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, 0, &shell_code_buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
+		return status;
+	}
+	uint8_t* flags = shell_code_buffer + 0x500;
+	uint8_t* load_shell_code = shell_code_buffer + PAGE_SIZE;
+
+	RtlZeroMemory(library_image_buffer, library_image_buffer_size);
+
+	//把dll文件复制到进程
+	RtlZeroMemory(library_file_buffer, library_file_buffer_size);
+	RtlCopyMemory(library_file_buffer, filebuffer, filesize);
+
+	//把shellcode复制到进程
+	RtlZeroMemory(shell_code_buffer, shell_code_buffer_size);
+	RtlCopyMemory(load_shell_code, MemLoadShellcode_x64, sizeof(MemLoadShellcode_x64));
+
+	uint8_t x64_buffer[] =
+	{
+		0x50,																				//push  rax
+		0x51,																				//push  rcx
+		0x52,																				//push  rdx
+		0x53,																				//push  rbx
+		0x55, 																				//push  rbp
+		0x56, 																				//push  rsi
+		0x57, 																				//push  rdi
+		0x41, 0x50, 																		//push  r8
+		0x41, 0x51, 																		//push  r9
+		0x41, 0x52, 																		//push  r10
+		0x41, 0x53, 																		//push  r11
+		0x41, 0x54, 																		//push  r12
+		0x41, 0x55, 																		//push  r13
+		0x41, 0x56, 																		//push  r14
+		0x41, 0x57, 																		//push  r15
+		0x48, 0xB8, 0x99, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00,0x00, 							//mov  rax,0x0000012345678999
+		0x48, 0xB9, 0x99, 0x99, 0x78, 0x56, 0x34, 0x12, 0x00, 0x00,							//mov  rcx,0x0000012345678999
+		0x48, 0x81, 0xEC, 0xA0, 0x00, 0x00, 0x00, 											//sub  rsp,0x00000000000000A8
+		0xFF, 0xD0, 																		//call rax
+		0x48, 0x81, 0xC4, 0xA0, 0x00, 0x00, 0x00, 											//add  rsp,0x00000000000000A8
+		0x41, 0x5F, 																		//pop  r15
+		0x41, 0x5E,																			//pop  r14
+		0x41, 0x5D, 																		//pop  r13
+		0x41, 0x5C, 																		//pop  r12
+		0x41, 0x5B, 																		//pop  r11
+		0x41, 0x5A, 																		//pop  r10
+		0x41, 0x59, 																		//pop  r9
+		0x41, 0x58, 																		//pop  r8
+		0x5F, 																				//pop  rdi
+		0x5E, 																				//pop  rsi
+		0x5D, 																				//pop  rbp
+		0x5B, 																				//pop  rbx
+		0x5A,																				//pop  rdx
+		0x59, 																				//pop  rcx
+		0x48, 0xB8, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00,							//mov  rax,0x0000000123456789
+		0x48, 0xC7, 0x00, 0x01, 0x00, 0x00, 0x00,											//mov  qword ptr ds:[rax],0x0000000000000001
+		0x58, 																				//pop  rax
+		0xFF, 0x25, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00	//jmp  qword ptr ds : [PCHunter64.00000001403ABA27]
+	};
+
+	PKTRAP_FRAME trap = *(PKTRAP_FRAME*)((char*)thread + GetTrapFrameOffset());		//线程
+	load_shell_code[0x50f] = 0x90;
+	load_shell_code[0x510] = 0x48;
+	load_shell_code[0x511] = 0xb8;
+	*(uint64_t*)&load_shell_code[0x512] = (uint64_t)library_image_buffer;
+	*(uint64_t*)&x64_buffer[25] = (uint64_t)load_shell_code;						//shellcode
+	*(uint64_t*)&x64_buffer[35] = (uint64_t)library_file_buffer;					//dll文件
+	*(uint64_t*)&x64_buffer[83] = (uint64_t)flags;									//falgs
+	*(uint64_t*)&x64_buffer[105] = trap->Rip;										//ret
+	RtlCopyMemory(shell_code_buffer, x64_buffer, sizeof(x64_buffer));				//注入
+	trap->Rip = (uint64_t)shell_code_buffer;										//修改rip
+
+	//恢复线程
+	status = PsResumeThread(thread, nullptr);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
+		return status;
+	}
+
+	LOG_INFO("imagebuffer: %llx", library_image_buffer);
+
+	uint64_t complete = 0;
+	boolean success = true;
+	int count = 0;
+
+	while (true) {
+		status = PsGetProcessExitStatus(process);
+		if (status != 0x103) {
+			break;
+		}
+
+		if (count > 10000) {
+			break;
+		}
+		//读取标记
+		RtlCopyMemory(&complete, flags, 8);
+		if (complete == 1) {
+			success = true;
+			break;
+		}
+
+		LARGE_INTEGER inTime;
+		inTime.QuadPart = 10 * -10000;
+		KeDelayExecutionThread(KernelMode, false, &inTime);
+		count++;
+	}
+
+	//释放内存
+	if (success) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
+		//隐藏内存
+		status = MemoryUtils::get_instance()->HideMemory(library_image_buffer, library_image_buffer_size);
+		if (!NT_SUCCESS(status)) {
+			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+		}
+	}
+	else {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
+	}
+
 	return status;
 }

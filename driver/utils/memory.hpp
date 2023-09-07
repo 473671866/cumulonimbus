@@ -97,6 +97,7 @@ public:
 		}
 		return;
 	}
+
 private:
 	uint64_t m_pte_base;
 	uint64_t m_pde_base;
@@ -104,9 +105,10 @@ private:
 	uint64_t m_pxe_base;
 };
 
-class MemoryUtils
+class MemoryUtils : public Singleton<MemoryUtils>
 {
 public:
+
 	MemoryUtils()
 	{
 		NOTHING;
@@ -117,7 +119,7 @@ public:
 		NOTHING;
 	}
 
-	template<typename _VA> NTSTATUS HideMemory(_VA temp)
+	template<typename _VA> NTSTATUS HideMemory(_VA temp, size_t size)
 	{
 		//参数校验
 		void* virtual_address = (void*)temp;
@@ -149,15 +151,37 @@ public:
 			return STATUS_UNSUCCESSFUL;
 		}
 
+		Record record{};
+		record.address = virtual_address;
+		record.size = size;
+		record.pfnbase = pfnbase;
+		record.process = PsGetCurrentProcess();;
+
 		//修改原始pte
-		LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx", pfnbase, virtual_address);
-		uint64_t pfn = MmGetPhysicalAddress(PAGE_ALIGN(virtual_address)).QuadPart >> 12;
-		pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
+		uint64_t start = reinterpret_cast<uint64_t>(PAGE_ALIGN(virtual_address));
+		uint64_t end = reinterpret_cast<uint64_t>(PAGE_ALIGN(start + size));
+		int i = 0;
+		while (end > start) {
+			//修改原始pte
+			uint64_t pfn = MmGetPhysicalAddress(reinterpret_cast<void*>(start)).QuadPart >> 12;
+			record.pfn[i] = pfn;
+			uint32_t attribute = pfnbase[pfn].OriginalPte.u.Soft.Protection;
+			record.attribute[i] = attribute;
+
+			pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
+
+			LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx, pfn: %llx, i: %d", pfnbase, start, pfn, i);
+			start += PAGE_SIZE;
+			i++;
+		}
+
+		record.index = i;
+		this->m_record.push_back(record);
 
 		return STATUS_SUCCESS;
 	}
 
-	template<typename _VA> NTSTATUS HideMemory(HANDLE pid, _VA temp)
+	template<typename _VA> NTSTATUS HideMemory(HANDLE pid, _VA temp, size_t size)
 	{
 		//参数校验
 		void* virtual_address = (void*)temp;
@@ -207,23 +231,79 @@ public:
 		KAPC_STATE apc{};
 		KeStackAttachProcess(process, &apc);
 
+		Record record{};
+		record.address = virtual_address;
+		record.size = size;
+		record.pfnbase = pfnbase;
+		record.process = process;
+
 		//修改原始pte
-		LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx", pfnbase, virtual_address);
-		uint64_t pfn = MmGetPhysicalAddress(PAGE_ALIGN(virtual_address)).QuadPart >> 12;
-		pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
+		uint64_t start = reinterpret_cast<uint64_t>(PAGE_ALIGN(virtual_address));
+		uint64_t end = reinterpret_cast<uint64_t>(PAGE_ALIGN(start + size));
+		int i = 0;
+		while (end > start)
+		{
+			//修改原始pte
+			uint64_t pfn = MmGetPhysicalAddress(reinterpret_cast<void*>(start)).QuadPart >> 12;
+			record.pfn[i] = pfn;
+
+			uint32_t attribute = pfnbase[pfn].OriginalPte.u.Soft.Protection;
+			record.attribute[i] = attribute;
+
+			pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
+
+			LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx, pfn: %llx, i: %d", pfnbase, start, pfn, i);
+			start += PAGE_SIZE;
+			i++;
+		}
+
+		record.index = i;
+		this->m_record.push_back(record);
 
 		KeUnstackDetachProcess(&apc);
 		ObDereferenceObject(process);
 		return status;
 	}
 
-	NTSTATUS ReadMemory()
+	template<typename _VA> NTSTATUS RecovreMemory(_VA temp)
 	{
-		NOTHING;
+		void* virtual_address = (void*)temp;
+		if (virtual_address == 0) {
+			LOG_WARN("invalid address");
+			return STATUS_INVALID_ADDRESS;
+		}
+
+		for (auto it = this->m_record.begin(); it != this->m_record.end();) {
+			Record record = *it;
+			if (record.address == virtual_address) {
+				KAPC_STATE apc{};
+				KeStackAttachProcess(record.process, &apc);
+				for (int i = 0; i < record.index; i++) {
+					record.pfnbase[record.pfn[i]].OriginalPte.u.Soft.Protection = record.attribute[i];
+					LOG_INFO("MmPfnDataBase: %llx, pfn: %llx, i: %d", record.pfnbase, record.pfn[i], i);
+				}
+				KeUnstackDetachProcess(&apc);
+				it = this->m_record.erase(it);
+				break;
+			}
+			else {
+				it++;
+			}
+		}
+		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS WriteMemory()
+private:
+	struct Record
 	{
-		NOTHING;
-	}
+		void* address;
+		size_t size;
+		size_t index;
+		MMPFN* pfnbase;
+		uint64_t pfn[10];
+		uint32_t attribute[10];
+		PEPROCESS process;
+	};
+
+	std::list<Record> m_record;
 };

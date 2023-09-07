@@ -1,6 +1,5 @@
 #include "utils.h"
 #include "memory.h"
-#include "../pdb/oxygenPdb.h"
 
 namespace Utils
 {
@@ -61,55 +60,6 @@ namespace Utils
 			ObDereferenceObject(process);
 			ExFreePoolWithTag(image_name, 0);
 		}
-		return status;
-	}
-
-	NTSTATUS RemoveProcessEntryList(HANDLE pid)
-	{
-		//取进程对象
-		PEPROCESS process = nullptr;
-		auto status = PsLookupProcessByProcessId(pid, &process);
-		if (NT_SUCCESS(status)) {
-			LOG_INFO("RemoveProcessEntryList\n");
-			//ActiveProcessLinks
-			oxygenPdb::Pdber ntos(L"ntoskrnl.exe");
-			ntos.init();
-
-			uint64_t ActiveProcessLinksOffset = ntos.GetOffset("_EPROCESS", "ActiveProcessLinks");
-			PLIST_ENTRY list = (PLIST_ENTRY)((char*)process + ActiveProcessLinksOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ProcessListEntry
-			uint64_t ProcessListEntryOffset = ntos.GetOffset("_KPROCESS", "ProcessListEntry");
-			list = (PLIST_ENTRY)((char*)process + ProcessListEntryOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ObjectTable
-			uint64_t ObjectTableOffset = ntos.GetOffset("_EPROCESS", "ObjectTable");
-			char* ObjectTable = (char*)*(void**)((char*)process + ObjectTableOffset);
-
-			//HandleTableList
-			uint64_t HandleTableListOffset = ntos.GetOffset("_HANDLE_TABLE", "HandleTableList");
-			list = *(PLIST_ENTRY*)((char*)ObjectTable + HandleTableListOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//PspCidTable
-			typedef PVOID(*ExpLookupHandleTableEntryProc)(PVOID PspCidTable, HANDLE ProcessId);
-			ExpLookupHandleTableEntryProc ExpLookupHandleTableEntry = reinterpret_cast<ExpLookupHandleTableEntryProc>(ntos.GetPointer("ExpLookupHandleTableEntry"));
-			PVOID PspCidTable = reinterpret_cast<PVOID>(ntos.GetPointer("PspCidTable"));
-			PVOID entry = ExpLookupHandleTableEntry(PspCidTable, pid);
-			if (MmIsAddressValid(entry)) {
-				RtlZeroMemory(entry, sizeof(entry));
-				uint64_t UniqueProcessIdOffset = ntos.GetOffset("_EPROCESS", "UniqueProcessId");
-				*(PHANDLE)((char*)process + UniqueProcessIdOffset) = 0;
-			}
-
-			ObDereferenceObject(process);
-		}
-
 		return status;
 	}
 
@@ -304,5 +254,62 @@ namespace Utils
 			}
 		}
 		return result;
+	}
+
+	void* LoadImage(std::wstring file_path, size_t* imagesize, size_t* filesize)
+	{
+		//初始化文件路径
+		file_path.insert(0, L"\\??\\");
+		UNICODE_STRING path{};
+		RtlInitUnicodeString(&path, file_path.c_str());
+
+		//初始化文件属性
+		OBJECT_ATTRIBUTES attributes{ };
+		InitializeObjectAttributes(&attributes, &path, OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+		//打开文件
+		HANDLE hfile = NULL;
+		IO_STATUS_BLOCK create_file_io_status{};
+		RtlZeroMemory(&create_file_io_status, sizeof(IO_STATUS_BLOCK));
+		NTSTATUS status = ZwCreateFile(&hfile, GENERIC_READ, &attributes, &create_file_io_status, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_OPEN, FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_ALERT, NULL, NULL);
+		if (!NT_SUCCESS(status)) {
+			return nullptr;
+		}
+
+		//获取文件大小
+		auto close_hfile = make_scope_exit([hfile] {ZwClose(hfile); });
+		FILE_STANDARD_INFORMATION fileInfo;
+		status = ZwQueryInformationFile(hfile, &create_file_io_status, &fileInfo, sizeof(fileInfo), FileStandardInformation);
+		if (!NT_SUCCESS(status)) {
+			return nullptr;
+		}
+
+		//创建文件缓冲区
+		size_t file_buffer_size = fileInfo.EndOfFile.QuadPart;
+		void* file_buffer = ExAllocatePool(PagedPool, file_buffer_size);
+		if (file_buffer == nullptr) {
+			return nullptr;
+		}
+
+		//读文件
+		LARGE_INTEGER file_pointer{  };
+		file_pointer.HighPart = -1;
+		file_pointer.LowPart = FILE_USE_FILE_POINTER_POSITION;
+		status = ZwReadFile(hfile, NULL, NULL, NULL, &create_file_io_status, file_buffer, file_buffer_size, &file_pointer, NULL);
+		if (!NT_SUCCESS(status)) {
+			return nullptr;
+		}
+
+		if (filesize) {
+			*filesize = file_buffer_size;
+		}
+
+		if (imagesize) {
+			PIMAGE_DOS_HEADER lpDosHeader = (PIMAGE_DOS_HEADER)file_buffer;
+			PIMAGE_NT_HEADERS lpNtHeader = (PIMAGE_NT_HEADERS)((uint8_t*)file_buffer + lpDosHeader->e_lfanew);
+			*imagesize = lpNtHeader->OptionalHeader.SizeOfImage;
+		}
+
+		return file_buffer;
 	}
 }

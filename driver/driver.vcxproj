@@ -60,7 +60,7 @@
     <DriverType>WDM</DriverType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <TargetVersion>Windows10</TargetVersion>
+    <TargetVersion>Windows7</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
@@ -162,6 +162,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>./capstone/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -236,7 +237,9 @@
     <ClInclude Include="standard\stdcpp.h" />
     <ClInclude Include="standard\unique_resource.h" />
     <ClInclude Include="utils\hook.hpp" />
+    <ClInclude Include="utils\MemLoadDll.h" />
     <ClInclude Include="utils\memory.hpp" />
+    <ClInclude Include="utils\process.hpp" />
     <ClInclude Include="utils\utils.h" />
     <ClInclude Include="utils\table.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

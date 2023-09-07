@@ -177,6 +177,12 @@
     <ClInclude Include="capstone\xcore.h">
       <Filter>capstone</Filter>
     </ClInclude>
+    <ClInclude Include="utils\process.hpp">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\MemLoadDll.h">
+      <Filter>utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="hde\LICENSE">
