@@ -1,5 +1,5 @@
 #include "comm.h"
-#include "pdb/oxygenPdb.h"
+#include "pdb/analysis.h"
 
 typedef NTSTATUS(NTAPI* KdEnumerateDebuggingDevicesProc)(PVOID UnKnown1, PVOID UnKnown2, PVOID UnKnown3);
 KdEnumerateDebuggingDevicesProc KdEnumerateDebuggingDevicesOriginal = nullptr;
@@ -24,7 +24,7 @@ NTSTATUS KdEnumerateDebuggingDevices(PVOID UnKnown1, PVOID UnKnown2, PVOID UnKno
 
 NTSTATUS Register(CommCallbackProc callback)
 {
-	oxygenPdb::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
+	analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 	uint64_t address = ntos.GetPointer("NtConvertBetweenAuxiliaryCounterAndPerformanceCounter");
 
 	if (address == 0) {

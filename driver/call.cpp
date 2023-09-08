@@ -1,5 +1,5 @@
 #include "call.h"
-#include "pdb/oxygenPdb.h"
+#include "pdb/analysis.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
 #include "utils/MemLoadDll.h"
@@ -86,7 +86,7 @@ PsGetNextProcessThread(
 {
 	static PsGetNextProcessThreadProc proc = nullptr;
 	if (proc == nullptr) {
-		oxygenPdb::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
+		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 		proc = reinterpret_cast<PsGetNextProcessThreadProc>(ntos.GetPointer("PsGetNextProcessThread"));
 		LOG_INFO("proc: %llx", proc);
 	}
@@ -102,7 +102,7 @@ PsSuspendThread(
 	static PsSuspendThreadProc proc = nullptr;
 
 	if (proc == nullptr) {
-		oxygenPdb::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
+		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 		proc = reinterpret_cast<PsSuspendThreadProc>(ntos.GetPointer("PsSuspendThread"));
 		LOG_INFO("proc: %llx", proc);
 	}
@@ -118,7 +118,7 @@ PsResumeThread(
 	static PsResumeThreadProc proc = nullptr;
 
 	if (proc == nullptr) {
-		oxygenPdb::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
+		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 		proc = reinterpret_cast<PsResumeThreadProc>(ntos.GetPointer("PsResumeThread"));
 		LOG_INFO("proc: %llx", proc);
 	}
@@ -129,7 +129,7 @@ uint64_t GetTrapFrameOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		oxygenPdb::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
+		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 		offset = ntos.GetOffset("_KTHREAD", "TrapFrame");
 		LOG_INFO("offset: %llx", offset);
 	}
@@ -153,37 +153,27 @@ VOID WorkerRoutine(
 	KeStackAttachProcess(process, &apc);
 
 	//读取标记
+	LARGE_INTEGER time{ .QuadPart = 10 * -10000 };
 	uint64_t flags = 0;
-	boolean success = true;
-	int count = 0;
 
-	while (1) {
+	for (int i = 0; i < 10000; i++) {
 		status = PsGetProcessExitStatus(process);
 		if (status != 0x103) {
-			break;
-		}
-
-		if (count > 10000) {
-			break;
+			KeUnstackDetachProcess(&apc);
+			ObDereferenceObject(process);
+			return;
 		}
 
 		RtlCopyMemory(&flags, (void*)fm->flags, 8);
 		if (flags == 1) {
-			success = true;
 			break;
 		}
-
-		LARGE_INTEGER inTime;
-		inTime.QuadPart = 10 * -10000;
-		KeDelayExecutionThread(KernelMode, false, &inTime);
-		count++;
+		KeDelayExecutionThread(KernelMode, false, &time);
 	}
 
 	//释放内存
-	if (success) {
-		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&fm->base, &fm->size, MEM_RELEASE);
-		ExFreePool(fm);
-	}
+	ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&fm->base, &fm->size, MEM_RELEASE);
+	ExFreePool(fm);
 	KeUnstackDetachProcess(&apc);
 	ObDereferenceObject(process);
 	return;
@@ -194,12 +184,12 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	//获取进程
 	PEPROCESS process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
+	auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
 
 	//进程是否在运行
-	auto dereference_process = make_scope_exit([process] {ObDereferenceObject(process); });
 	status = PsGetProcessExitStatus(process);
 	if (status != 0x103) {
 		return STATUS_PROCESS_IS_TERMINATING;
@@ -207,12 +197,12 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 	//获取主线程
 	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
+	auto dereference_thread = make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 	if (thread == nullptr) {
 		return STATUS_THREAD_IS_TERMINATING;
 	}
 
 	//挂起线程
-	auto dereference_thread = make_scope_exit([thread] {ObDereferenceObject(thread); });
 	status = PsSuspendThread(thread, nullptr);
 	if (!NT_SUCCESS(status)) {
 		return status;
@@ -225,11 +215,10 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 	//申请内核内存
 	PVOID kernel_buffer = ExAllocatePool(NonPagedPool, size);
+	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)ExFreePool(kernel_buffer); });
 	if (!kernel_buffer) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}
-
-	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)ExFreePool(kernel_buffer); });
 
 	//把shellcode复制到内核
 	RtlZeroMemory(kernel_buffer, size);
@@ -332,7 +321,6 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 	//恢复线程
 	status = PsResumeThread(thread, nullptr);
-
 	if (NT_SUCCESS(status)) {
 		FreeMemory* fm = reinterpret_cast<FreeMemory*>(ExAllocatePool(NonPagedPool, sizeof(FreeMemory)));
 		fm->pid = pid;
@@ -350,30 +338,17 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	return status;
 }
 
-struct FreeMemoryEx
-{
-	WORK_QUEUE_ITEM item;
-	HANDLE pid;
-	void* library_file_buffer;
-	size_t library_file_buffer_size;
-	void* library_image_buffer;
-	size_t library_image_buffer_size;
-	void* shell_code_buffer;
-	size_t shell_code_buffer_size;
-	void* flags;
-};
-
 NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
 {
 	//获取进程
 	PEPROCESS process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
+	auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
 
 	//进程是否在运行
-	auto dereference_process = make_scope_exit([process] {ObDereferenceObject(process); });
 	status = PsGetProcessExitStatus(process);
 	if (status != 0x103) {
 		return STATUS_PROCESS_IS_TERMINATING;
@@ -381,12 +356,12 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 
 	//获取主线程
 	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
+	auto dereference_thread = make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 	if (thread == nullptr) {
 		return STATUS_THREAD_IS_TERMINATING;
 	}
 
 	//挂起线程
-	auto dereference_thread = make_scope_exit([thread] {ObDereferenceObject(thread); });
 	status = PsSuspendThread(thread, nullptr);
 	if (!NT_SUCCESS(status)) {
 		return status;
@@ -422,6 +397,7 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 		ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
 		return status;
 	}
+
 	uint8_t* flags = shell_code_buffer + 0x500;
 	uint8_t* load_shell_code = shell_code_buffer + PAGE_SIZE;
 
@@ -500,18 +476,13 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 
 	LOG_INFO("imagebuffer: %llx", library_image_buffer);
 
+	LARGE_INTEGER time{ .QuadPart = 10 * -10000 };
 	uint64_t complete = 0;
 	boolean success = true;
-	int count = 0;
 
-	while (true) {
-		status = PsGetProcessExitStatus(process);
-		if (status != 0x103) {
-			break;
-		}
-
-		if (count > 10000) {
-			break;
+	for (int i = 0; i < 10000; i++) {
+		if (PsGetProcessExitStatus(process) != 0x103) {
+			return STATUS_PROCESS_IS_TERMINATING;
 		}
 		//读取标记
 		RtlCopyMemory(&complete, flags, 8);
@@ -519,28 +490,22 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 			success = true;
 			break;
 		}
-
-		LARGE_INTEGER inTime;
-		inTime.QuadPart = 10 * -10000;
-		KeDelayExecutionThread(KernelMode, false, &inTime);
-		count++;
+		KeDelayExecutionThread(KernelMode, false, &time);
 	}
 
-	//释放内存
 	if (success) {
-		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
-		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
 		//隐藏内存
-		status = MemoryUtils::get_instance()->HideMemory(library_image_buffer, library_image_buffer_size);
+		status = memory::MemoryUtils::get_instance()->HideMemory(library_image_buffer, library_image_buffer_size);
 		if (!NT_SUCCESS(status)) {
-			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
 		}
 	}
 	else {
-		ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
-		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
-		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
 	}
 
+	//释放内存
+	ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
+	ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
 	return status;
 }

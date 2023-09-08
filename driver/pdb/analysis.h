@@ -1,9 +1,8 @@
 #pragma once
 #include <fltKernel.h>
-#pragma comment(lib, "./pdb/oxygenpdb.lib")
-#pragma comment(lib,"Netio.lib")
+#pragma comment(lib, "./pdb/analysis_pdb.lib")
 
-namespace oxygenPdb {
+namespace analysis {
 	class Pdber {
 	public:
 		Pdber(const wchar_t* moduleName);

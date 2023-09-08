@@ -1,6 +1,8 @@
 #pragma once
 #include <ntifs.h>
 
+typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY RUNTIME_FUNCTION, * PRUNTIME_FUNCTION;
+
 #pragma region Ps
 
 EXTERN_C

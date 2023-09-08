@@ -4,7 +4,6 @@
 #include "call.h"
 
 //TODO:
-//×¢Èë
 //Ä£¿éhook
 
 NTSTATUS Controller(CommPackage* package)
@@ -33,8 +32,6 @@ void DriverUnload(PDRIVER_OBJECT)
 	return;
 }
 
-#include "pdb/oxygenPdb.h"
-
 EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 {
 	constexpr auto log_level = (IsReleaseBuild()) ? kLogPutLevelInfo : kLogPutLevelDebug;
@@ -48,14 +45,6 @@ EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 	if (driver_object != nullptr) {
 		driver_object->DriverUnload = DriverUnload;
 	}
-
-	size_t imagesize = 0;
-	size_t file_size = 0;
-	void* file_buffer = Utils::LoadImage(L"C:\\Users\\ljw-cccc\\Desktop\\Dll.dll", &imagesize, &file_size);
-	if (file_buffer != nullptr) {
-		LoadLibrary_x64((HANDLE)3692, file_buffer, file_size, imagesize);
-	}
-	ExFreePool(file_buffer);
 
 	return Register(Controller);
 }

@@ -1,6 +1,6 @@
 #pragma once
 #include "../standard/base.h"
-#include "../pdb/oxygenPdb.h"
+#include "../pdb/analysis.h"
 
 class ProcessUtils
 {
@@ -191,7 +191,7 @@ public:
 		if (NT_SUCCESS(status)) {
 			LOG_INFO("RemoveProcessEntryList\n");
 			//ActiveProcessLinks
-			oxygenPdb::Pdber ntos(L"ntoskrnl.exe");
+			analysis::Pdber ntos(L"ntoskrnl.exe");
 			ntos.init();
 
 			uint64_t ActiveProcessLinksOffset = ntos.GetOffset("_EPROCESS", "ActiveProcessLinks");

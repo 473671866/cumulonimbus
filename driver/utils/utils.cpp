@@ -1,7 +1,7 @@
 #include "utils.h"
 #include "memory.h"
 
-namespace Utils
+namespace utils
 {
 	NTSTATUS LookupProcessByImageFileName(std::string name, PEPROCESS* p)
 	{
@@ -63,58 +63,6 @@ namespace Utils
 		return status;
 	}
 
-	char* CharToUper(char* wstr, boolean isAllocateMemory)
-	{
-		char* result = NULL;
-
-		if (isAllocateMemory) {
-			size_t len = strlen(wstr) + 2;
-			result = (char*)ExAllocatePoolWithTag(PagedPool, len, 'char');
-
-			if (!result)return 0;
-
-			memset(result, 0, len);
-			memcpy(result, wstr, len - 2);
-		}
-		else {
-			result = wstr;
-		}
-		_strupr(result);
-		return result;
-	}
-
-	inline char CharToHex(unsigned char* ch)
-	{
-		unsigned char temps[2] = { 0 };
-		for (int i = 0; i < 2; i++) {
-			if (ch[i] >= '0' && ch[i] <= '9') {
-				temps[i] = (ch[i] - '0');
-			}
-			else if (ch[i] >= 'A' && ch[i] <= 'F') {
-				temps[i] = (ch[i] - 'A') + 0xA;
-			}
-			else if (ch[i] >= 'a' && ch[i] <= 'f') {
-				temps[i] = (ch[i] - 'a') + 0xA;
-			}
-		}
-		return ((temps[0] << 4) & 0xf0) | (temps[1] & 0xf);
-	}
-
-	int32_t StringToHex(unsigned char* hex, unsigned char* str, size_t size)
-	{
-		int i = 0;
-		for (; i < size; i++) {
-			if (*str == '*' || *str == '?') {
-				hex[i] = *str;
-				str++;
-				continue;
-			}
-			hex[i] = CharToHex(str);
-			str += 2;
-		}
-		return i;
-	}
-
 	uint64_t GetKernelModule(std::string module_name, size_t* size)
 	{
 		RTL_PROCESS_MODULES process_modules;
@@ -132,40 +80,36 @@ namespace Utils
 			if (!process_module) {
 				return 0;
 			}
+
 			RtlZeroMemory(process_module, length);
+			auto free_memory = make_scope_exit([process_module] {	ExFreePoolWithTag(process_module, 'size'); });
 
 			//第二次查询
 			status = ZwQuerySystemInformation(SystemModuleInformation, process_module, length, &result);
-
-			//失败
 			if (!NT_SUCCESS(status)) {
-				ExFreePoolWithTag(process_module, 'size');
 				return 0;
 			}
 
-			//开始查询
+			//ntoskrnl直接返回第一个
 			if (_stricmp(module_name.c_str(), "ntkrnlpa.exe") == 0 || _stricmp(module_name.c_str(), "ntoskrnl.exe") == 0) {
 				PRTL_PROCESS_MODULE_INFORMATION ModuleInfo = &(process_module->Modules[0]);
-				base = (uint64_t)ModuleInfo->ImageBase;
 				if (size) {
 					*size = ModuleInfo->ImageSize;
 				}
+				base = (uint64_t)ModuleInfo->ImageBase;
+				return base;
 			}
-			else {
-				//遍历模块
-				for (ULONG i = 0; i < process_module->NumberOfModules; i++) {
-					PRTL_PROCESS_MODULE_INFORMATION processModule = &process_module->Modules[i];
-
-					if (_stricmp((PCHAR)processModule->FullPathName, module_name.c_str())) {
-						base = (ULONG_PTR)processModule->ImageBase;
-						if (size) {
-							*size = processModule->ImageSize;
-						}
-						break;
+			//遍历模块
+			for (size_t i = 0; i < process_module->NumberOfModules; i++) {
+				PRTL_PROCESS_MODULE_INFORMATION processModule = &process_module->Modules[i];
+				if (_stricmp((PCHAR)processModule->FullPathName, module_name.c_str())) {
+					base = (ULONG_PTR)processModule->ImageBase;
+					if (size) {
+						*size = processModule->ImageSize;
 					}
+					break;
 				}
 			}
-			ExFreePoolWithTag(process_module, 'size');
 		}
 		return base;
 	}
@@ -283,6 +227,9 @@ namespace Utils
 		if (!NT_SUCCESS(status)) {
 			return nullptr;
 		}
+#pragma warning (push)
+#pragma warning(disable:4996)
+#pragma warning(disable:4267)
 
 		//创建文件缓冲区
 		size_t file_buffer_size = fileInfo.EndOfFile.QuadPart;
@@ -299,6 +246,8 @@ namespace Utils
 		if (!NT_SUCCESS(status)) {
 			return nullptr;
 		}
+
+#pragma warning (pop)
 
 		if (filesize) {
 			*filesize = file_buffer_size;

@@ -67,6 +67,9 @@
     <ClCompile Include="call.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="rw.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils\hook.hpp">
@@ -138,9 +141,6 @@
     <ClInclude Include="hde\table64.h">
       <Filter>hde</Filter>
     </ClInclude>
-    <ClInclude Include="pdb\oxygenPdb.h">
-      <Filter>pdb</Filter>
-    </ClInclude>
     <ClInclude Include="comm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -183,24 +183,30 @@
     <ClInclude Include="utils\MemLoadDll.h">
       <Filter>utils</Filter>
     </ClInclude>
+    <ClInclude Include="rw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pdb\analysis.h">
+      <Filter>pdb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="hde\LICENSE">
       <Filter>hde</Filter>
     </None>
-    <None Include="pdb\oxygenpdb.pdb">
-      <Filter>pdb</Filter>
-    </None>
     <None Include="capstone\capstone_static_winkernel.pdb">
       <Filter>capstone</Filter>
     </None>
+    <None Include="pdb\analysis_pdb.pdb">
+      <Filter>pdb</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="pdb\oxygenpdb.lib">
-      <Filter>pdb</Filter>
-    </Library>
     <Library Include="capstone\capstone_static_winkernel.lib">
       <Filter>capstone</Filter>
+    </Library>
+    <Library Include="pdb\analysis_pdb.lib">
+      <Filter>pdb</Filter>
     </Library>
   </ItemGroup>
 </Project>

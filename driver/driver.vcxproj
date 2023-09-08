@@ -187,6 +187,7 @@
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="hde\hde32.cpp" />
     <ClCompile Include="hde\hde64.cpp" />
+    <ClCompile Include="rw.cpp" />
     <ClCompile Include="standard\exit.cpp" />
     <ClCompile Include="standard\kernel_stl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
@@ -218,7 +219,8 @@
     <ClInclude Include="hde\hde_stdint.h" />
     <ClInclude Include="hde\table32.h" />
     <ClInclude Include="hde\table64.h" />
-    <ClInclude Include="pdb\oxygenPdb.h" />
+    <ClInclude Include="pdb\analysis.h" />
+    <ClInclude Include="rw.h" />
     <ClInclude Include="standard\base.h" />
     <ClInclude Include="standard\exit.h" />
     <ClInclude Include="standard\ia32.h" />
@@ -257,11 +259,11 @@
   <ItemGroup>
     <None Include="capstone\capstone_static_winkernel.pdb" />
     <None Include="hde\LICENSE" />
-    <None Include="pdb\oxygenpdb.pdb" />
+    <None Include="pdb\analysis_pdb.pdb" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="capstone\capstone_static_winkernel.lib" />
-    <Library Include="pdb\oxygenpdb.lib" />
+    <Library Include="pdb\analysis_pdb.lib" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
