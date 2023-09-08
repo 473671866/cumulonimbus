@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include "sope_exit.h"
 
 int main(int arg, char** argv) {
 	if (arg < 2) {
@@ -17,6 +18,7 @@ int main(int arg, char** argv) {
 
 	auto filesize = std::filesystem::file_size(file_path);
 	std::ifstream istream(file_path, std::ios::binary);
+	std::experimental::make_scope_exit([&]() { istream.close(); });
 	if (istream.is_open() == false) {
 		std::cout << "打开文件失败\n";
 		system("pause");
@@ -24,17 +26,18 @@ int main(int arg, char** argv) {
 	}
 
 	unsigned char* filebuffer = new unsigned char[filesize];
+	std::experimental::make_scope_exit([&]() { delete[] filebuffer; });
 	istream.read((char*)filebuffer, filesize);
 	if (istream.fail()) {
 		std::cout << "读取文件失败\n";
 		system("pause");
 		return -4;
 	}
-	istream.close();
 
 	//写
 	file_path.replace_extension(".hpp");
 	std::ofstream ostream(file_path, std::ios::binary);
+	std::experimental::make_scope_exit([&]() { ostream.close(); });
 	if (!ostream.is_open()) {
 		std::cout << "创建文件失败\n";
 		system("pause");
@@ -53,8 +56,6 @@ int main(int arg, char** argv) {
 		}
 	}
 	ostream << "\r\n};";
-	ostream.close();
 
-	delete[] filebuffer;
 	return 0;
 }
