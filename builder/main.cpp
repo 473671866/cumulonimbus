@@ -1,7 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
-#include "sope_exit.h"
+#include "sope_exit.hpp"
 
 int main(int arg, char** argv) {
 	if (arg < 2) {
@@ -17,7 +17,7 @@ int main(int arg, char** argv) {
 	}
 
 	std::ifstream istream(file_path, std::ios::binary);
-	auto close_istream = std::experimental::make_scope_exit([&]() { istream.close(); });
+	auto istream_close = std::experimental::make_scope_exit([&]() { istream.close(); });
 	if (istream.is_open() == false) {
 		std::cout << "打开文件失败\n";
 		system("pause");

@@ -20,7 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sope_exit.h">
+    <ClInclude Include="sope_exit.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
