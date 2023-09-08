@@ -7,13 +7,17 @@ class ProcessUtils
 public:
 	ProcessUtils()
 	{
+		this->m_mapping_process = nullptr;
+		this->m_current_pid = 0;
+		this->m_mapping_address = nullptr;
 	}
 
 	~ProcessUtils()
 	{
+		NOTHING;
 	}
 
-	NTSTATUS StackAttachProcess(HANDLE pid, KAPC_STATE* apc)
+	NTSTATUS StackAttachProcess(HANDLE pid)
 	{
 		//初始化字符串
 		UNICODE_STRING name{ };
@@ -78,11 +82,11 @@ public:
 		ObDereferenceObject(physical_memory_section);
 
 		//附加假进程
-		KeStackAttachProcess(this->m_mapping_process, apc);
+		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS StackAttachProcess(PEPROCESS process, KAPC_STATE* apc)
+	NTSTATUS StackAttachProcess(PEPROCESS process)
 	{
 		//初始化字符串
 		UNICODE_STRING name{ };
@@ -135,11 +139,11 @@ public:
 		ObDereferenceObject(physical_memory_section);
 
 		//附加假进程
-		KeStackAttachProcess(this->m_mapping_process, apc);
+		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS StackAttachProcessOriginal(PEPROCESS process, KAPC_STATE* apc)
+	NTSTATUS StackAttachProcessOriginal(PEPROCESS process)
 	{
 		//申请映射进程内存
 		this->m_mapping_process = reinterpret_cast<PEPROCESS>(ExAllocatePoolZero(NonPagedPool, PAGE_SIZE, 'cr3'));
@@ -152,18 +156,47 @@ public:
 		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = *(uint64_t*)((uint8_t*)process + 0x28);
 
 		//附加假进程
-		KeStackAttachProcess(this->m_mapping_process, apc);
+		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS UnStackAttachProcessOriginal(KAPC_STATE* apc)
+	NTSTATUS StackAttachProcessOriginal(HANDLE pid)
 	{
-		KeUnstackDetachProcess(apc);
+		PEPROCESS  process = nullptr;
+		auto status = PsLookupProcessByProcessId(pid, &process);
+		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+
+		status = PsGetProcessExitStatus(process);
+		if (status != 0x103) {
+			return status;
+		}
+
+		//申请映射进程内存
+		this->m_mapping_process = reinterpret_cast<PEPROCESS>(ExAllocatePoolZero(NonPagedPool, PAGE_SIZE, 'cr3'));
+		if (this->m_mapping_process == nullptr) {
+			return STATUS_MEMORY_NOT_ALLOCATED;
+		}
+
+		//复制进程
+		RtlCopyMemory(this->m_mapping_process, process, PAGE_SIZE);
+		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = *(uint64_t*)((uint8_t*)process + 0x28);
+
+		//附加假进程
+		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
+		return STATUS_SUCCESS;
+	}
+
+	NTSTATUS UnStackAttachProcessOriginal()
+	{
+		KeUnstackDetachProcess(&this->m_apc);
 		ExFreePoolWithTag(this->m_mapping_process, 'cr3');
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS UnStackAttachProcess(KAPC_STATE* apc)
+	NTSTATUS UnStackAttachProcess()
 	{
 		OBJECT_ATTRIBUTES obj;
 		InitializeObjectAttributes(&obj, NULL, OBJ_CASE_INSENSITIVE, NULL, NULL);
@@ -175,7 +208,7 @@ public:
 			return status;
 		}
 
-		KeUnstackDetachProcess(apc);
+		KeUnstackDetachProcess(&this->m_apc);
 		ExFreePoolWithTag(this->m_mapping_process, 'cr3');
 		status = ZwUnmapViewOfSection(hprocess, this->m_mapping_address);
 
@@ -236,4 +269,5 @@ private:
 	PEPROCESS m_mapping_process;
 	HANDLE m_current_pid;
 	void* m_mapping_address;
+	KAPC_STATE m_apc;
 };

@@ -45,6 +45,5 @@ EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 	if (driver_object != nullptr) {
 		driver_object->DriverUnload = DriverUnload;
 	}
-
 	return Register(Controller);
 }

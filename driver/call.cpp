@@ -199,6 +199,11 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
 	auto dereference_thread = make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 	if (thread == nullptr) {
+		return STATUS_THREAD_NOT_IN_PROCESS;
+	}
+
+	if (PsGetThreadExitStatus(thread) != 0x103)
+	{
 		return STATUS_THREAD_IS_TERMINATING;
 	}
 
@@ -214,8 +219,8 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 #pragma warning(disable:4302)
 
 	//申请内核内存
-	PVOID kernel_buffer = ExAllocatePool(NonPagedPool, size);
-	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)ExFreePool(kernel_buffer); });
+	PVOID kernel_buffer = memory::MemoryUtils::RtlAllocateMemory(NonPagedPool, size);
+	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)  memory::MemoryUtils::RtlFreeMemory(kernel_buffer); });
 	if (!kernel_buffer) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}
@@ -340,6 +345,10 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
 {
+	if (pid == 0 || filebuffer == nullptr || filesize == 0 || imagesize == 0) {
+		return STATUS_INVALID_PARAMETER;
+	}
+
 	//获取进程
 	PEPROCESS process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
@@ -358,6 +367,11 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
 	auto dereference_thread = make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 	if (thread == nullptr) {
+		return STATUS_THREAD_NOT_IN_PROCESS;
+	}
+
+	if (PsGetThreadExitStatus(thread) != 0x103)
+	{
 		return STATUS_THREAD_IS_TERMINATING;
 	}
 
@@ -372,7 +386,7 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 	auto detach = make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
 
 	//dll文件内存
-	void* library_file_buffer = 0;
+	void* library_file_buffer = nullptr;
 	size_t library_file_buffer_size = filesize;
 	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &library_file_buffer, 0, &library_file_buffer_size, MEM_COMMIT, PAGE_READWRITE);
 	if (!NT_SUCCESS(status)) {
@@ -380,7 +394,7 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 	}
 
 	//dll镜像内存
-	void* library_image_buffer = 0;
+	void* library_image_buffer = nullptr;
 	size_t library_image_buffer_size = imagesize;
 	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &library_image_buffer, 0, &library_image_buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 	if (!NT_SUCCESS(status)) {

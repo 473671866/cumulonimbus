@@ -1,6 +1,6 @@
 #pragma once
 #include "../Standard/base.h"
-#include "../pdb/oxygenPdb.h"
+#include "../pdb/analysis.h"
 #include "utils.h"
 
 struct ServiceDescriptorTable
@@ -17,7 +17,7 @@ public:
 
 	ServiceTableUtils()
 	{
-		oxygenPdb::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
+		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 		this->m_service_table = reinterpret_cast<ServiceDescriptorTable*>(ntos.GetPointer("KeServiceDescriptorTable"));
 		this->m_service_table_shadow = reinterpret_cast<ServiceDescriptorTable*>(ntos.GetPointer("KeServiceDescriptorTableShadow"));
 	}
@@ -54,7 +54,7 @@ public:
 		PEPROCESS process = nullptr;
 		KAPC_STATE apc{ NULL };
 
-		if (NT_SUCCESS(Utils::LookupProcessByImageFileName("explorer.exe", &process))) {
+		if (NT_SUCCESS(utils::LookupProcessByImageFileName("explorer.exe", &process))) {
 			KeStackAttachProcess(process, &apc);
 
 			LONG offset = this->m_service_table_shadow->ServiceTable[service_number];

@@ -194,10 +194,24 @@ namespace memory
 
 		template<typename _VA> NTSTATUS HideMemory(HANDLE pid, _VA temp, size_t size)
 		{
+			//获取进程
+			PEPROCESS process = nullptr;
+			auto status = PsLookupProcessByProcessId(pid, &process);
+			if (!NT_SUCCESS(status)) {
+				LOG_WARN("get PsLookupProcessByProcessId failed status: %llx", status);
+				return status;
+			}
+
+			if (PsGetProcessExitStatus(process) == 0x103) {
+				LOG_WARN("process is termination");
+				ObDereferenceObject(process);
+				return STATUS_PROCESS_IS_TERMINATING;
+			}
+
 			//参数校验
 			void* virtual_address = (void*)temp;
-			if (pid == 0 || virtual_address == 0 || !MmIsAddressValid(virtual_address)) {
-				LOG_WARN("invalid pid or address");
+			if (virtual_address == 0 || !MmIsAddressValid(virtual_address)) {
+				LOG_WARN("invalid address");
 				return STATUS_INVALID_ADDRESS;
 			}
 
@@ -224,20 +238,6 @@ namespace memory
 				return STATUS_UNSUCCESSFUL;
 			}
 
-			//获取进程
-			PEPROCESS process = nullptr;
-			auto status = PsLookupProcessByProcessId(pid, &process);
-			if (!NT_SUCCESS(status)) {
-				LOG_WARN("get PsLookupProcessByProcessId failed status: %llx", status);
-				return status;
-			}
-
-			if (PsGetProcessExitStatus(process) == 0x103) {
-				LOG_WARN("process is termination");
-				ObDereferenceObject(process);
-				return STATUS_PROCESS_IS_TERMINATING;
-			}
-
 			//附加
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
@@ -257,7 +257,6 @@ namespace memory
 
 				uint32_t attribute = pfnbase[pfn].OriginalPte.u.Soft.Protection;
 				record.attribute[i] = attribute;
-
 				pfnbase[pfn].OriginalPte.u.Soft.Protection = MM_NOACCESS;
 
 				LOG_INFO("MmPfnDataBase: %llx VritualAddress: %llx, pfn: %llx, i: %d", pfnbase, start, pfn, i);
@@ -298,6 +297,23 @@ namespace memory
 				}
 			}
 			return STATUS_SUCCESS;
+		}
+
+		static void* RtlAllocateMemory(POOL_TYPE type, size_t size)
+		{
+			void* p = ExAllocatePoolWithTag(type, size, 'mem');
+			if (p) {
+				RtlZeroMemory(p, size);
+			}
+			return p;
+		}
+
+		static void RtlFreeMemory(void* address)
+		{
+			if (address) {
+				ExFreePoolWithTag(address, 'mem');
+			}
+			return;
 		}
 
 	private:

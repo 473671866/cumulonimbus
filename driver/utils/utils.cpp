@@ -247,6 +247,12 @@ namespace utils
 			return nullptr;
 		}
 
+		PIMAGE_DOS_HEADER lpDosHeader = (PIMAGE_DOS_HEADER)file_buffer;
+		PIMAGE_NT_HEADERS lpNtHeader = (PIMAGE_NT_HEADERS)((uint8_t*)file_buffer + lpDosHeader->e_lfanew);
+		if (lpDosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
+			return nullptr;
+		}
+
 #pragma warning (pop)
 
 		if (filesize) {
@@ -254,8 +260,6 @@ namespace utils
 		}
 
 		if (imagesize) {
-			PIMAGE_DOS_HEADER lpDosHeader = (PIMAGE_DOS_HEADER)file_buffer;
-			PIMAGE_NT_HEADERS lpNtHeader = (PIMAGE_NT_HEADERS)((uint8_t*)file_buffer + lpDosHeader->e_lfanew);
 			*imagesize = lpNtHeader->OptionalHeader.SizeOfImage;
 		}
 
