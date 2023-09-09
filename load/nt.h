@@ -105,6 +105,26 @@ typedef struct _RTL_PROCESS_MODULES {
 	RTL_PROCESS_MODULE_INFORMATION Modules[1];
 } RTL_PROCESS_MODULES, * PRTL_PROCESS_MODULES;
 
+typedef struct _KLDR_DATA_TABLE_ENTRY {
+	LIST_ENTRY InLoadOrderLinks;
+	PVOID ExceptionTable;
+	ULONG ExceptionTableSize;
+	PVOID GpValue;
+	PVOID NonPagedDebugInfo;
+	PVOID DllBase;
+	PVOID EntryPoint;
+	ULONG SizeOfImage;
+	UNICODE_STRING FullDllName;
+	UNICODE_STRING BaseDllName;
+	ULONG Flags;
+	USHORT LoadCount;
+	USHORT __Unused5;
+	PVOID SectionPointer;
+	ULONG CheckSum;
+	PVOID LoadedImports;
+	PVOID PatchInformation;
+} KLDR_DATA_TABLE_ENTRY, * PKLDR_DATA_TABLE_ENTRY;
+
 NTSTATUS ZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, void* SystemInformation, ULONG SystemInformationLength, ULONG* ReturnLength);
 
 NTKERNELAPI

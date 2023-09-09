@@ -1,12 +1,14 @@
 #include <ntifs.h>
 #include "loader.h"
 #include "utils.h"
-
+#include "nt.h"
 typedef struct _CommPackage
 {
 	ULONG64 filesize;
 	ULONG64 filebuffer;
 }CommPackage;
+
+PUNICODE_STRING g_register_path;
 
 NTSTATUS CreateAndClose(DEVICE_OBJECT* DeviceObject, IRP* Irp)
 {
@@ -78,19 +80,29 @@ NTSTATUS ControlDispath(DEVICE_OBJECT* DeviceObject, IRP* Irp)
 
 VOID DriverUnload(PDRIVER_OBJECT driver_object)
 {
+	UNICODE_STRING symbol_name;
+	RtlInitUnicodeString(&symbol_name, L"\\??\\ljw");
+	IoDeleteSymbolicLink(&symbol_name);
 	if (driver_object->DeviceObject) {
-		UNICODE_STRING symbol_name;
-		RtlInitUnicodeString(&symbol_name, L"\\??\\ljw");
-		IoDeleteSymbolicLink(&symbol_name);
 		IoDeleteDevice(driver_object->DeviceObject);
 	}
+
+	//PKLDR_DATA_TABLE_ENTRY LdrTableEntry = (PKLDR_DATA_TABLE_ENTRY)driver_object->DriverSection;
+	//if (LdrTableEntry) {
+	//	SelfDeleteFile(LdrTableEntry->FullDllName.Buffer);
+	//}
+
+	//if (g_register_path) {
+	//	DeleteRegisterPath(g_register_path);
+	//}
+
 	KdPrintEx((77, 0, "driver unload\n"));
 }
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING register_path)
 {
 	driver_object->DriverUnload = DriverUnload;
-
+	g_register_path = register_path;
 	UNICODE_STRING device_name;
 	RtlInitUnicodeString(&device_name, L"\\device\\Reincarnation");
 
@@ -113,7 +125,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING register_path
 	driver_object->MajorFunction[IRP_MJ_CLOSE] = CreateAndClose;
 	driver_object->MajorFunction[IRP_MJ_WRITE] = ControlDispath;
 
-	DeleteRegisterPath(register_path);
-	SelfDeleteFile(register_path);
+	KdPrintEx((77, 0, "driver load\n"));
 	return STATUS_SUCCESS;
 }

@@ -2,7 +2,7 @@
 #include "../Standard/base.h"
 #include "../hde/hde.h"
 #include "./memory.hpp"
-
+#include"../vmp/VMProtectDDK.h"
 #define HOOK_FLAG 'hook'
 #define POOL_FLAG 'rest'
 
@@ -56,12 +56,16 @@ namespace hook_engine
 	public:
 		InlineHook()
 		{
+			VMPBegin("InlineHook");
 			ExInitializeResourceLite(&this->m_mutex);
 			ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(HookRecord), HOOK_FLAG, NULL);
+			VMPEnd();
 		}
 
 		~InlineHook()
 		{
+			VMPBegin("~InlineHook");
+
 			KeEnterCriticalRegion();
 			ExAcquireResourceExclusiveLite(&this->m_mutex, true);
 
@@ -85,11 +89,14 @@ namespace hook_engine
 			ExReleaseResourceLite(&this->m_mutex);
 			ExDeleteResourceLite(&this->m_mutex);
 			ExDeleteNPagedLookasideList(&this->m_lookaside);
+			VMPEnd();
 			return;
 		}
 
 		template<typename _Fn, typename _Or> boolean Install(_Fn function, void* handler, _Or original)
 		{
+			VMPBegin("InlineHook Install");
+
 			uint64_t address = (uint64_t)function;
 			if (address == 0 || handler == nullptr || original == nullptr) {
 				LOG_INFO("Inline Hook: invalid address: %llx, handle: %llx", address, handler);
@@ -157,11 +164,14 @@ namespace hook_engine
 			KeLeaveCriticalRegion();
 			ExReleaseResourceLite(&this->m_mutex);
 			LOG_INFO("Inline Hook: hook success address: %llx", address);
+			VMPEnd();
 			return true;
 		}
 
 		template<typename _Fn>  boolean Delete(_Fn function)
 		{
+			VMPBegin("InlineHook Delete");
+
 			uint64_t address = (uint64_t)function;
 			if (address == 0) {
 				LOG_WARN("invalid address");
@@ -194,11 +204,14 @@ namespace hook_engine
 			ExReleaseResourceLite(&this->m_mutex);
 			KeLeaveCriticalRegion();
 			LOG_INFO("Inline Hook: delete hook success address: %llx", address);
+			VMPEnd();
 			return true;
 		}
 
 		HookRecord* LookupRecord(uint64_t address)
 		{
+			VMPBegin("InlineHook LookupRecord");
+
 			auto it = find_if(this->m_record_list.begin(), this->m_record_list.end(),
 				[&address](HookRecord* record) {
 					return (record->address == address || record->handler == address);
@@ -207,6 +220,7 @@ namespace hook_engine
 			if (it != this->m_record_list.end()) {
 				return *it;
 			}
+			VMPEnd();
 			return nullptr;
 		}
 
@@ -221,17 +235,25 @@ namespace hook_engine
 	public:
 		PageTableHook()
 		{
+			VMPBegin("PageTableHook");
+
 			KeInitializeSpinLock(&this->m_spin_lock);
 			ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(PteHookRecord), HOOK_FLAG, NULL);
+			VMPEnd();
 		}
 
 		~PageTableHook()
 		{
+			VMPBegin("~PageTableHook");
+
 			ExDeleteNPagedLookasideList(&this->m_lookaside);
+			VMPEnd();
 		}
 
 		template<typename _Fn, typename _Or> boolean Install(_Fn function, void* handler, _Or original)
 		{
+			VMPBegin("PageTableHook Install");
+
 			uint64_t address = (uint64_t)function;
 			if (address == 0 || handler == nullptr || original == nullptr) {
 				LOG_WARN("invalid address: %llx", address);
@@ -371,11 +393,14 @@ namespace hook_engine
 
 			*(void**)original = trampline;
 			LOG_INFO("hook success address: %llx", address);
+			VMPEnd();
 			return true;
 		}
 
 		template<typename _Fn, typename _Or> boolean Install(HANDLE pid, _Fn function, void* handler, _Or original)
 		{
+			VMPBegin("PageTableHook Install2");
+
 			PEPROCESS process = nullptr;
 			auto status = PsLookupProcessByProcessId(pid, &process);
 			auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
@@ -532,11 +557,14 @@ namespace hook_engine
 
 			*(void**)original = trampline;
 			LOG_INFO("hook success address: %llx", address);
+			VMPEnd();
 			return true;
 		}
 
 		template<typename _Fn> boolean Delete(_Fn function)
 		{
+			VMPBegin("PageTableHook Delete");
+
 			uint64_t address = (uint64_t)function;
 			PteHookRecord* record = LookupRecord(address);
 			if (record == nullptr) {
@@ -570,15 +598,19 @@ namespace hook_engine
 			record = nullptr;
 
 			LOG_INFO("PteHook: delete hook address: %llx\n", address);
+			VMPEnd();
 			return true;
 		}
 
 		PteHookRecord* LookupRecord(uint64_t address)
 		{
+			VMPBegin("PageTableHook LookupRecord");
+
 			auto it = find_if(this->m_record_list.begin(), this->m_record_list.end(), [&address](PteHookRecord* record) {return record->address == address; });
 			if (it != this->m_record_list.end()) {
 				return *it;
 			}
+			VMPEnd();
 			return nullptr;
 		}
 

@@ -74,7 +74,6 @@ BOOLEAN UpdataIAT(unsigned __int8* imagebuffer)
 	for (; lpImportDricetory->FirstThunk; lpImportDricetory++) {
 		unsigned char* module_name = (imagebuffer + lpImportDricetory->Name);
 		void* base = GetKenelModule(module_name, NULL);
-		KdPrintEx((77, 0, "module_name: %s module_address: %llx\n", module_name, base));
 		if (!base) {
 			isSuccess = FALSE;
 			break;

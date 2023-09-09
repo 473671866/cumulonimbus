@@ -3,30 +3,33 @@
 #include "load.hpp"
 #include "loader.h"
 #include "driver.hpp"
+#include "spoce_exit.hpp"
 
 boolean Launcher()
 {
 	char temppath[MAX_PATH]{};
 	GetTempPathA(MAX_PATH, temppath);
 	std::string filename = loader::RandomString(10);
+	std::string service_name = loader::RandomString(10);
 	std::filesystem::path driverpath(std::string(temppath).append(filename).append(".sys"));
 	boolean success = loader::GenerateDriver(driverpath, load, sizeof(load));
 	if (!success) {
-		return success;
+		goto unload;
 	}
 
-	std::string service_name = loader::RandomString(10);
 	success = loader::LoadDriver(driverpath, service_name);
 	if (!success) {
-		return success;
+		goto unload;
 	}
 
 	success = loader::MappingDriver(driver, sizeof(driver));
 	if (!success) {
-		return success;
+		goto unload;
 	}
 
+unload:
 	success = loader::UnLoadDriver(service_name);
+	if (std::filesystem::exists(driverpath))std::filesystem::remove(driverpath);
 	if (!success) {
 		return success;
 	}

@@ -261,7 +261,6 @@ public:
 
 			ObDereferenceObject(process);
 		}
-
 		return status;
 	}
 

@@ -188,7 +188,6 @@ namespace memory
 			}
 			record.index = i;
 			this->m_record.push_back(record);
-
 			return STATUS_SUCCESS;
 		}
 

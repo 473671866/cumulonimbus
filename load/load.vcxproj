@@ -137,14 +137,12 @@
       <Command>Builder_Debug.cmd</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>Builder_Debug.cmd</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>Builder_Release.cmd</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>Builder_Release.cmd</Command>

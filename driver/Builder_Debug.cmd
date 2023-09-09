@@ -6,7 +6,7 @@ cd ../
 set "preProjectpath=%cd%"
 cd %projectpath%
 
-set "SignFullPath=%preProjectpath%\x64\Debug\load.sys"
+set "SignFullPath=%preProjectpath%\x64\Debug\driver.sys"
 
 @rem D:\DSignTool\CSignTool.exe sign /r landong /f %SignFullPath% /ac
 

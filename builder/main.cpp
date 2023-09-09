@@ -35,6 +35,7 @@ int main(int arg, char** argv) {
 	}
 
 	//д
+	file_path.replace_extension("");
 	file_path.replace_extension(".hpp");
 	std::filesystem::path source(argv[2]);
 	source = source / file_path.filename();

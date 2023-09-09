@@ -4,13 +4,17 @@
 
 int main(int arg, char** argv)
 {
-	Launcher();
-	//if (!Examine()) {
-	//	printf("¡¥Ω” ß∞‹\n");
-	//	system("pause");
-	//	return 0;
-	//}
+	if (!Launcher())
+	{
+		std::cerr << "º”‘ÿ ß∞‹\n";
+	}
 
+	if (!Examine()) {
+		printf("¡¥Ω” ß∞‹\n");
+		system("pause");
+		return 0;
+	}
+	printf("¡¥Ω”≥…π¶\n");
 	//HMODULE hmodule = LoadLibraryA("user32.dll");
 	//uint64_t msg = (uint64_t)GetProcAddress(hmodule, "MessageBoxA");
 	//printf("msg: %llx\n", msg);
