@@ -10,11 +10,9 @@ int main(int arg, char** argv)
 	}
 
 	if (!Examine()) {
-		printf("链接失败\n");
-		system("pause");
-		return 0;
+		std::cerr << "链接失败\n";
 	}
-	printf("链接成功\n");
+
 	//HMODULE hmodule = LoadLibraryA("user32.dll");
 	//uint64_t msg = (uint64_t)GetProcAddress(hmodule, "MessageBoxA");
 	//printf("msg: %llx\n", msg);
@@ -38,6 +36,7 @@ int main(int arg, char** argv)
 	//int64_t buffer = 0x123456789;
 	//Comm::controller(&buffer, sizeof(buffer));
 	//std::cout << buffer << std::endl;
+
 	system("pause");
 
 	return 0;

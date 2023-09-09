@@ -13,7 +13,9 @@ inline boolean Register()
 boolean SengMessageEx(Command command, void* buffer, size_t length)
 {
 	if (!NtConvertBetweenAuxiliaryCounterAndPerformanceCounter) {
-		Register();
+		if (!Register()) {
+			return false;
+		}
 	}
 
 	CommPackage package{  };

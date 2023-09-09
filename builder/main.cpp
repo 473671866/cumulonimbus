@@ -35,10 +35,8 @@ int main(int arg, char** argv) {
 	}
 
 	//д
-	file_path.replace_extension("");
-	file_path.replace_extension(".hpp");
 	std::filesystem::path source(argv[2]);
-	source = source / file_path.filename();
+	source = source / file_path.replace_extension("").replace_extension(".hpp").filename();
 	std::ofstream ostream(source, std::ios::binary);
 	auto ostream_close = std::experimental::make_scope_exit([&]() { ostream.close(); });
 	if (!ostream.is_open()) {

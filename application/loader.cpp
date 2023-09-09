@@ -48,47 +48,43 @@ namespace loader
 	boolean LoadDriver(std::filesystem::path dirverpath, std::string service_name)
 	{
 		SC_HANDLE hmanager = OpenSCManagerA(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+		auto close_hmanager = std::experimental::make_scope_exit([&] {if (hmanager) { CloseServiceHandle(hmanager); }});
 		if (!hmanager) {
 			return false;
 		}
 
 		SC_HANDLE hservice = CreateServiceA(hmanager, service_name.c_str(), service_name.c_str(), SERVICE_ALL_ACCESS, SERVICE_KERNEL_DRIVER, SERVICE_DEMAND_START, SERVICE_ERROR_IGNORE, dirverpath.string().c_str(), NULL, NULL, NULL, NULL, NULL);
+		auto close_hservcie = std::experimental::make_scope_exit([&] {if (hservice) { CloseServiceHandle(hservice); }});
 		if (!hservice) {
 			hservice = OpenServiceA(hmanager, service_name.c_str(), SERVICE_ALL_ACCESS);
 			if (!hservice) {
-				CloseServiceHandle(hmanager);
 				return false;
 			}
 		}
 
 		boolean success = StartServiceA(hservice, 0, NULL);
-		CloseServiceHandle(hmanager);
-		CloseServiceHandle(hservice);
 		return success;
 	}
 
 	boolean UnLoadDriver(std::string service_name)
 	{
 		SC_HANDLE hmanager = OpenSCManagerA(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+		auto close_hmanager = std::experimental::make_scope_exit([&] {if (hmanager) { CloseServiceHandle(hmanager); }});
 		if (!hmanager) {
 			return false;
 		}
 
 		SC_HANDLE  hservice = OpenServiceA(hmanager, service_name.c_str(), SERVICE_ALL_ACCESS);
+		auto close_hservcie = std::experimental::make_scope_exit([&] {if (hservice) { CloseServiceHandle(hservice); }});
 		if (!hservice) {
-			CloseServiceHandle(hmanager);
 			return false;
 		}
 
 		SERVICE_STATUS status{};
 		boolean success = ControlService(hservice, SERVICE_CONTROL_STOP, &status);
 		if (!success) {
-			CloseServiceHandle(hmanager);
-			CloseServiceHandle(hservice);
 			return false;
 		}
-		CloseServiceHandle(hmanager);
-		CloseServiceHandle(hservice);
 		return DeleteService(hservice);
 	}
 
