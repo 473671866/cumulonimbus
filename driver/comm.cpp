@@ -24,7 +24,6 @@ NTSTATUS KdEnumerateDebuggingDevices(PVOID UnKnown1, PVOID UnKnown2, PVOID UnKno
 
 NTSTATUS Register(CommCallbackProc callback)
 {
-	LOG_INFO("comm register \n");
 	analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
 	uint64_t address = ntos.GetPointer("NtConvertBetweenAuxiliaryCounterAndPerformanceCounter");
 	if (address == 0 || !MmIsAddressValid((void*)address)) {

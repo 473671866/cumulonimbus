@@ -17,4 +17,13 @@ namespace utils
 	PVOID  GetRoutineStartAddress(uint64_t image_base, void* address);
 
 	void* LoadImage(std::wstring file_path, size_t* imagesize, size_t* filesize);
+
+	void* RtlAllocateMemory(POOL_TYPE type, size_t size);
+
+	void RtlFreeMemory(void* address);
+
+	namespace ldr
+	{
+		PVOID GetApplicationModule(HANDLE process_id, PCHAR module_name, PSIZE_T image_size);
+	}
 }

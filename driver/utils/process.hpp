@@ -1,6 +1,7 @@
 #pragma once
 #include "../standard/base.h"
 #include "../pdb/analysis.h"
+#include "utils.h"
 
 class ProcessUtils
 {
@@ -8,8 +9,7 @@ public:
 	ProcessUtils()
 	{
 		this->m_mapping_process = nullptr;
-		this->m_current_pid = 0;
-		this->m_mapping_address = nullptr;
+		this->m_mapping_cr3_virtual = nullptr;
 	}
 
 	~ProcessUtils()
@@ -28,7 +28,8 @@ public:
 		InitializeObjectAttributes(&obj, &name, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
 		//打开节区
-		HANDLE hmemory;
+		HANDLE hmemory = nullptr;
+		auto close_hmemory = make_scope_exit([hmemory] {if (hmemory)ZwClose(hmemory); });
 		NTSTATUS status = ZwOpenSection(&hmemory, SECTION_ALL_ACCESS, &obj);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -36,50 +37,54 @@ public:
 
 		//获取节区对象
 		PVOID physical_memory_section = NULL;
+		auto dereference_physical_memory_section = make_scope_exit([physical_memory_section] {if (physical_memory_section)ObDereferenceObject(physical_memory_section); });
 		status = ObReferenceObjectByHandle(hmemory, SECTION_ALL_ACCESS, NULL, KernelMode, &physical_memory_section, NULL);
 		if (!NT_SUCCESS(status)) {
-			ZwClose(hmemory);
 			return status;
 		}
 
 		//获取进程
 		PEPROCESS process = nullptr;
+		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 		status = PsLookupProcessByProcessId(pid, &process);
 		if (!NT_SUCCESS(status)) {
-			ZwClose(hmemory);
-			ObDereferenceObject(physical_memory_section);
 			return status;
+		}
+
+		//复制映射cr3的内存
+		this->m_mapping_cr3_virtual = utils::RtlAllocateMemory(NonPagedPool, PAGE_SIZE);
+		if (m_mapping_cr3_virtual == nullptr) {
+			return STATUS_MEMORY_NOT_ALLOCATED;
+		}
+
+		//申请映射进程内存
+		this->m_mapping_process = reinterpret_cast<PEPROCESS>(utils::RtlAllocateMemory(NonPagedPool, PAGE_SIZE));
+		if (this->m_mapping_process == nullptr) {
+			return STATUS_MEMORY_NOT_ALLOCATED;
 		}
 
 		//映射进程cr3
 		size_t size = PAGE_SIZE;
 		LARGE_INTEGER mapping{ .QuadPart = *(int64_t*)((uint8_t*)process + 0x28) };
-		this->m_current_pid = PsGetCurrentProcessId();
-		status = ZwMapViewOfSection(hmemory, NtCurrentProcess(), &this->m_mapping_address, 0, PAGE_SIZE, &mapping, &size, ViewUnmap, MEM_TOP_DOWN, PAGE_READWRITE);
+		void* mapping_address = nullptr;
+		status = ZwMapViewOfSection(hmemory, NtCurrentProcess(), &mapping_address, 0, PAGE_SIZE, &mapping, &size, ViewUnmap, MEM_TOP_DOWN, PAGE_READWRITE);
 		if (!NT_SUCCESS(status)) {
-			ZwClose(hmemory);
-			ObDereferenceObject(process);
-			ObDereferenceObject(physical_memory_section);
+			utils::RtlFreeMemory(this->m_mapping_process);
+			utils::RtlFreeMemory(this->m_mapping_cr3_virtual);
 			return status;
 		}
 
-		//申请映射进程内存
-		this->m_mapping_process = reinterpret_cast<PEPROCESS>(ExAllocatePoolZero(NonPagedPool, PAGE_SIZE, 'cr3'));
-		if (this->m_mapping_process == nullptr) {
-			ZwClose(hmemory);
-			ObDereferenceObject(process);
-			ObDereferenceObject(physical_memory_section);
-			return STATUS_MEMORY_NOT_ALLOCATED;
-		}
+		//复制cr3
+		RtlCopyMemory(this->m_mapping_cr3_virtual, mapping_address, PAGE_SIZE);
 
 		//复制进程
 		RtlCopyMemory(this->m_mapping_process, process, PAGE_SIZE);
-		PHYSICAL_ADDRESS mapping_cr3 = MmGetPhysicalAddress(this->m_mapping_address);
-		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = mapping_cr3.QuadPart;
 
-		ZwClose(hmemory);
-		ObDereferenceObject(process);
-		ObDereferenceObject(physical_memory_section);
+		//替换cr3
+		PHYSICAL_ADDRESS mapping_cr3_physical = MmGetPhysicalAddress(this->m_mapping_cr3_virtual);
+		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = mapping_cr3_physical.QuadPart;
+
+		ZwUnmapViewOfSection(NtCurrentProcess(), mapping_address);
 
 		//附加假进程
 		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
@@ -97,123 +102,67 @@ public:
 		InitializeObjectAttributes(&obj, &name, OBJ_CASE_INSENSITIVE, NULL, NULL);
 
 		//打开节区
-		HANDLE hmemory;
+		HANDLE hmemory = nullptr;
+		auto close_hmemory = make_scope_exit([hmemory] {if (hmemory)ZwClose(hmemory); });
 		NTSTATUS status = ZwOpenSection(&hmemory, SECTION_ALL_ACCESS, &obj);
 		if (!NT_SUCCESS(status)) {
 			return status;
 		}
 
 		//获取节区对象
-		PVOID physical_memory_section = NULL;
+		PVOID physical_memory_section = nullptr;
+		auto dereference_physical_memory_section = make_scope_exit([physical_memory_section] {if (physical_memory_section)ObDereferenceObject(physical_memory_section); });
 		status = ObReferenceObjectByHandle(hmemory, SECTION_ALL_ACCESS, NULL, KernelMode, &physical_memory_section, NULL);
 		if (!NT_SUCCESS(status)) {
-			ZwClose(hmemory);
 			return status;
+		}
+
+		//复制映射cr3的内存
+		this->m_mapping_cr3_virtual = utils::RtlAllocateMemory(NonPagedPool, PAGE_SIZE);
+		if (m_mapping_cr3_virtual == nullptr) {
+			return STATUS_MEMORY_NOT_ALLOCATED;
+		}
+
+		//申请映射进程内存
+		this->m_mapping_process = reinterpret_cast<PEPROCESS>(utils::RtlAllocateMemory(NonPagedPool, PAGE_SIZE));
+		if (this->m_mapping_process == nullptr) {
+			return STATUS_MEMORY_NOT_ALLOCATED;
 		}
 
 		//映射进程cr3
 		size_t size = PAGE_SIZE;
 		LARGE_INTEGER mapping{ .QuadPart = *(int64_t*)((uint8_t*)process + 0x28) };
-		this->m_current_pid = PsGetCurrentProcessId();
-		status = ZwMapViewOfSection(hmemory, NtCurrentProcess(), &this->m_mapping_address, 0, PAGE_SIZE, &mapping, &size, ViewUnmap, MEM_TOP_DOWN, PAGE_READWRITE);
+		void* mapping_address = nullptr;
+		status = ZwMapViewOfSection(hmemory, NtCurrentProcess(), &mapping_address, 0, PAGE_SIZE, &mapping, &size, ViewUnmap, MEM_TOP_DOWN, PAGE_READWRITE);
 		if (!NT_SUCCESS(status)) {
-			ZwClose(hmemory);
-			ObDereferenceObject(physical_memory_section);
+			utils::RtlFreeMemory(this->m_mapping_process);
+			utils::RtlFreeMemory(this->m_mapping_cr3_virtual);
 			return status;
 		}
 
-		//申请映射进程内存
-		this->m_mapping_process = reinterpret_cast<PEPROCESS>(ExAllocatePoolZero(NonPagedPool, PAGE_SIZE, 'cr3'));
-		if (this->m_mapping_process == nullptr) {
-			ZwClose(hmemory);
-			ObDereferenceObject(physical_memory_section);
-			return STATUS_MEMORY_NOT_ALLOCATED;
-		}
+		//复制cr3
+		RtlCopyMemory(this->m_mapping_cr3_virtual, mapping_address, PAGE_SIZE);
 
 		//复制进程
 		RtlCopyMemory(this->m_mapping_process, process, PAGE_SIZE);
-		PHYSICAL_ADDRESS mapping_cr3 = MmGetPhysicalAddress(this->m_mapping_address);
+
+		//替换cr3
+		PHYSICAL_ADDRESS mapping_cr3 = MmGetPhysicalAddress(this->m_mapping_cr3_virtual);
 		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = mapping_cr3.QuadPart;
 
-		ZwClose(hmemory);
-		ObDereferenceObject(physical_memory_section);
+		ZwUnmapViewOfSection(NtCurrentProcess(), mapping_address);
 
 		//附加假进程
 		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
-		return STATUS_SUCCESS;
-	}
-
-	NTSTATUS StackAttachProcessOriginal(PEPROCESS process)
-	{
-		//申请映射进程内存
-		this->m_mapping_process = reinterpret_cast<PEPROCESS>(ExAllocatePoolZero(NonPagedPool, PAGE_SIZE, 'cr3'));
-		if (this->m_mapping_process == nullptr) {
-			return STATUS_MEMORY_NOT_ALLOCATED;
-		}
-
-		//复制进程
-		RtlCopyMemory(this->m_mapping_process, process, PAGE_SIZE);
-		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = *(uint64_t*)((uint8_t*)process + 0x28);
-
-		//附加假进程
-		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
-		return STATUS_SUCCESS;
-	}
-
-	NTSTATUS StackAttachProcessOriginal(HANDLE pid)
-	{
-		PEPROCESS  process = nullptr;
-		auto status = PsLookupProcessByProcessId(pid, &process);
-		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
-		if (!NT_SUCCESS(status)) {
-			return status;
-		}
-
-		status = PsGetProcessExitStatus(process);
-		if (status != 0x103) {
-			return status;
-		}
-
-		//申请映射进程内存
-		this->m_mapping_process = reinterpret_cast<PEPROCESS>(ExAllocatePoolZero(NonPagedPool, PAGE_SIZE, 'cr3'));
-		if (this->m_mapping_process == nullptr) {
-			return STATUS_MEMORY_NOT_ALLOCATED;
-		}
-
-		//复制进程
-		RtlCopyMemory(this->m_mapping_process, process, PAGE_SIZE);
-		*(uint64_t*)((uint8_t*)this->m_mapping_process + 0x28) = *(uint64_t*)((uint8_t*)process + 0x28);
-
-		//附加假进程
-		KeStackAttachProcess(this->m_mapping_process, &this->m_apc);
-		return STATUS_SUCCESS;
-	}
-
-	NTSTATUS UnStackAttachProcessOriginal()
-	{
-		KeUnstackDetachProcess(&this->m_apc);
-		ExFreePoolWithTag(this->m_mapping_process, 'cr3');
 		return STATUS_SUCCESS;
 	}
 
 	NTSTATUS UnStackAttachProcess()
 	{
-		OBJECT_ATTRIBUTES obj;
-		InitializeObjectAttributes(&obj, NULL, OBJ_CASE_INSENSITIVE, NULL, NULL);
-
-		CLIENT_ID client_id{ .UniqueProcess = this->m_current_pid };
-		HANDLE hprocess = nullptr;
-		auto status = ZwOpenProcess(&hprocess, PROCESS_ALL_ACCESS, &obj, &client_id);
-		if (!NT_SUCCESS(status)) {
-			return status;
-		}
-
 		KeUnstackDetachProcess(&this->m_apc);
-		ExFreePoolWithTag(this->m_mapping_process, 'cr3');
-		status = ZwUnmapViewOfSection(hprocess, this->m_mapping_address);
-
-		ZwClose(hprocess);
-		return status;
+		utils::RtlFreeMemory(this->m_mapping_cr3_virtual);
+		utils::RtlFreeMemory(this->m_mapping_process);
+		return STATUS_SUCCESS;
 	}
 
 	NTSTATUS RemoveProcessEntryList(HANDLE pid)
@@ -265,8 +214,7 @@ public:
 	}
 
 private:
+	void* m_mapping_cr3_virtual;
 	PEPROCESS m_mapping_process;
-	HANDLE m_current_pid;
-	void* m_mapping_address;
 	KAPC_STATE m_apc;
 };

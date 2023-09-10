@@ -218,7 +218,7 @@ namespace memory
 			UNICODE_STRING name{};
 			RtlInitUnicodeString(&name, L"MmGetVirtualForPhysical");
 			uint8_t* address = static_cast<uint8_t*>(MmGetSystemRoutineAddress(&name));
-			if (address == 0) {
+			if (address == 0 || !MmIsAddressValid(address)) {
 				LOG_WARN("get MmGetVirtualForPhysical failed");
 				return STATUS_UNSUCCESSFUL;
 			}
@@ -297,24 +297,6 @@ namespace memory
 			}
 			return STATUS_SUCCESS;
 		}
-
-		static void* RtlAllocateMemory(POOL_TYPE type, size_t size)
-		{
-			void* p = ExAllocatePoolWithTag(type, size, 'mem');
-			if (p) {
-				RtlZeroMemory(p, size);
-			}
-			return p;
-		}
-
-		static void RtlFreeMemory(void* address)
-		{
-			if (address) {
-				ExFreePoolWithTag(address, 'mem');
-			}
-			return;
-		}
-
 	private:
 		std::list<HideRecord> m_record;
 	};

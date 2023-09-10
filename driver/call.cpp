@@ -1,5 +1,6 @@
 #include "call.h"
 #include "pdb/analysis.h"
+#include "utils/utils.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
 #include "utils/MemLoadDll.h"
@@ -219,8 +220,8 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 #pragma warning(disable:4302)
 
 	//ÉêÇëÄÚºËÄÚ´æ
-	PVOID kernel_buffer = memory::MemoryUtils::RtlAllocateMemory(NonPagedPool, size);
-	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)  memory::MemoryUtils::RtlFreeMemory(kernel_buffer); });
+	PVOID kernel_buffer = utils::RtlAllocateMemory(NonPagedPool, size);
+	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)  utils::RtlFreeMemory(kernel_buffer); });
 	if (!kernel_buffer) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}

@@ -1,4 +1,5 @@
 #include "rw.h"
+#include "utils/utils.h"
 #include "utils/process.hpp"
 #include "utils/memory.hpp"
 
@@ -22,7 +23,7 @@ NTSTATUS ReadMappingMemory(HANDLE pid, void* address, void* buffer, size_t size)
 		return STATUS_INVALID_ADDRESS;
 	}
 
-	void* temp = memory::MemoryUtils::RtlAllocateMemory(PagedPool, size);
+	void* temp = utils::RtlAllocateMemory(PagedPool, size);
 	if (temp == nullptr) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}
@@ -34,57 +35,12 @@ NTSTATUS ReadMappingMemory(HANDLE pid, void* address, void* buffer, size_t size)
 	}
 
 	if (MmIsAddressValid(address)) {
-		RtlCopyMemory(address, temp, size);
+		RtlCopyMemory(temp, address, size);
 	}
 
 	prc.UnStackAttachProcess();
-
 	RtlCopyMemory(buffer, temp, size);
-	memory::MemoryUtils::RtlFreeMemory(temp);
-
-	return status;
-}
-
-NTSTATUS ReadCopyMemory(HANDLE pid, void* address, void* buffer, size_t size)
-{
-	if (address > MmHighestUserAddress) {
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) >> (uint64_t)MmHighestUserAddress)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) < (uint64_t)address)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (buffer == nullptr || !MmIsAddressValid(buffer)) {
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	void* temp = memory::MemoryUtils::RtlAllocateMemory(PagedPool, size);
-	if (temp == nullptr) {
-		return STATUS_MEMORY_NOT_ALLOCATED;
-	}
-
-	ProcessUtils prc;
-	auto status = prc.StackAttachProcessOriginal(pid);
-	if (!NT_SUCCESS(status)) {
-		return status;
-	}
-
-	if (MmIsAddressValid(address)) {
-		RtlCopyMemory(address, temp, size);
-	}
-
-	prc.UnStackAttachProcessOriginal();
-
-	RtlCopyMemory(buffer, temp, size);
-	memory::MemoryUtils::RtlFreeMemory(temp);
-
+	utils::RtlFreeMemory(temp);
 	return status;
 }
 
@@ -120,28 +76,28 @@ NTSTATUS ReadPhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size
 		return STATUS_INVALID_ADDRESS;
 	}
 
-	void* temp = memory::MemoryUtils::RtlAllocateMemory(PagedPool, size);
+	void* temp = utils::RtlAllocateMemory(PagedPool, size);
 	if (temp == nullptr) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}
 
-	cr3 system_dicetory{ .flags = __readcr3() };
-	cr3 process_dircetory{ .flags = *(uint64_t*)((uint8_t*)process + 0x28) };
+	uint64_t system_dicetory = __readcr3();
+	uint64_t process_dircetory = *(uint64_t*)((uint8_t*)process + 0x28);
 
 	KeEnterCriticalRegion();
 	_disable();
-	__writecr3(process_dircetory.address_of_page_directory << 12);
+	__writecr3(process_dircetory);
 
 	if (MmIsAddressValid(address)) {
-		RtlCopyMemory(address, temp, size);
+		RtlCopyMemory(temp, address, size);
 	}
 
 	_enable();
-	__writecr3(system_dicetory.address_of_page_directory << 12);
+	__writecr3(system_dicetory);
 	KeLeaveCriticalRegion();
 
 	RtlCopyMemory(buffer, temp, size);
-	memory::MemoryUtils::RtlFreeMemory(temp);
+	utils::RtlFreeMemory(temp);
 
 	return status;
 }
@@ -178,32 +134,33 @@ NTSTATUS WritePhysicalMemory(HANDLE pid, void* address, void* buffer, size_t siz
 		return STATUS_INVALID_ADDRESS;
 	}
 
-	void* temp = memory::MemoryUtils::RtlAllocateMemory(PagedPool, size);
+	void* temp = utils::RtlAllocateMemory(PagedPool, size);
 	if (temp == nullptr) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}
+
 	RtlCopyMemory(temp, buffer, size);
 
-	cr3 system_dicetory{ .flags = __readcr3() };
-	cr3 process_dircetory{ .flags = *(uint64_t*)((uint8_t*)process + 0x28) };
+	uint64_t system_dicetory = __readcr3();
+	uint64_t process_dircetory = *(uint64_t*)((uint8_t*)process + 0x28);
 
 	KeEnterCriticalRegion();
 	_disable();
-	__writecr3(process_dircetory.address_of_page_directory << 12);
+	__writecr3(process_dircetory);
 
 	if (MmIsAddressValid(address)) {
 		void* mapping = MmMapIoSpace(MmGetPhysicalAddress(address), size, MmCached);
 		if (mapping) {
-			RtlCopyMemory(temp, address, size);
-			MmUnmapIoSpace(address, size);
+			RtlCopyMemory(address, temp, size);
+			MmUnmapIoSpace(mapping, size);
 		}
 	}
 
 	_enable();
-	__writecr3(system_dicetory.address_of_page_directory << 12);
+	__writecr3(system_dicetory);
 	KeLeaveCriticalRegion();
 
-	memory::MemoryUtils::RtlFreeMemory(temp);
+	utils::RtlFreeMemory(temp);
 
 	return status;
 }
