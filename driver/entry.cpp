@@ -8,6 +8,11 @@
 
 //TODO:
 //模块hook
+//机器码
+//图标
+//窗口
+//反截图
+//申请内存
 
 NTSTATUS Controller(CommPackage* package)
 {
@@ -58,7 +63,7 @@ NTSTATUS Controller(CommPackage* package)
 
 	case Command::HideProcess: {
 		LOG_INFO("HideProcess");
-		return ProcessUtils().RemoveProcessEntryList(reinterpret_cast<HANDLE>(package->buffer));
+		return ProcessUtils::RemoveProcessEntryList(reinterpret_cast<HANDLE>(package->buffer));
 	}
 
 	case Command::Module: {

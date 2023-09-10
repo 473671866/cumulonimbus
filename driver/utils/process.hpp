@@ -165,7 +165,7 @@ public:
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS RemoveProcessEntryList(HANDLE pid)
+	static NTSTATUS RemoveProcessEntryList(HANDLE pid)
 	{
 		//取进程对象
 		PEPROCESS process = nullptr;
@@ -210,6 +210,77 @@ public:
 
 			ObDereferenceObject(process);
 		}
+		return status;
+	}
+
+	static NTSTATUS PsAllocateMemory(HANDLE pid, void** address, size_t size, uint32_t protect)
+	{
+		//获取进程
+		PEPROCESS process = nullptr;
+		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+		auto status = PsLookupProcessByProcessId(pid, &process);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+
+		if (PsGetProcessExitStatus(process) != 0x103) {
+			return STATUS_PROCESS_IS_TERMINATING;
+		}
+
+		KAPC_STATE apc{};
+		KeStackAttachProcess(process, &apc);
+
+		void* allocate_base = nullptr;
+		size_t region_size = size;
+		ZwAllocateVirtualMemory(NtCurrentProcess(), &allocate_base, 0, &region_size, MEM_COMMIT, protect);
+		KeUnstackDetachProcess(&apc);
+
+		if (address) {
+			*address = allocate_base;
+		}
+		return status;
+	}
+
+	static NTSTATUS PsFreeMemory(HANDLE pid, void* address, size_t size)
+	{
+		PEPROCESS process = nullptr;
+		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+		auto status = PsLookupProcessByProcessId(pid, &process);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+
+		if (PsGetProcessExitStatus(process) != 0x103) {
+			return STATUS_PROCESS_IS_TERMINATING;
+		}
+
+		KAPC_STATE apc{};
+		KeStackAttachProcess(process, &apc);
+
+		void* allocate_base = address;
+		size_t region_size = size;
+		auto status = ZwFreeVirtualMemory(NtCurrentProcess(), &allocate_base, &region_size, MEM_RELEASE);
+
+		KeUnstackDetachProcess(&apc);
+		return status;
+	}
+
+	static NTSTATUS PsTerminateProcess(HANDLE pid)
+	{
+		CLIENT_ID clientid{  };
+		clientid.UniqueProcess = pid;
+
+		OBJECT_ATTRIBUTES attribute{  };
+		attribute.Length = sizeof(OBJECT_ATTRIBUTES);
+
+		HANDLE handle = nullptr;
+		auto status = ZwOpenProcess(&handle, PROCESS_ALL_ACCESS, &attribute, &clientid);
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
+
+		status = ZwTerminateProcess(handle, STATUS_SUCCESS);
+		ZwClose(handle);
 		return status;
 	}
 
