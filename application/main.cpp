@@ -32,7 +32,6 @@ DWORD GetPid()
 int main(int arg, char** argv)
 {
 	if (!Launcher()) {
-		std::cerr << "¼ÓÔØÊ§°Ü:" << GetLastError() << std::endl;
 		system("pause");
 	}
 
@@ -51,7 +50,7 @@ int main(int arg, char** argv)
 	uint64_t address = 0x15a000 + base;
 	uint64_t calladdress = base + 0xe6f0;
 
-	LoadLibrary_x64(pid, "C:\\Users\\ljw-cccc\\Desktop\\Dll.dll");
+	LoadLibrary_x64(pid, "F:\\Code\\Kernel\\cumolonimbus\\x64\\Release\\Dll.dll");
 
 	uint8_t buffer[]
 	{

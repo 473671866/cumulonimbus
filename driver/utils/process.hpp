@@ -193,7 +193,7 @@ public:
 
 			//HandleTableList
 			uint64_t HandleTableListOffset = ntos.GetOffset("_HANDLE_TABLE", "HandleTableList");
-			list = *(PLIST_ENTRY*)((char*)ObjectTable + HandleTableListOffset);
+			list = (PLIST_ENTRY)((char*)ObjectTable + HandleTableListOffset);
 			RemoveEntryList(list);
 			InitializeListHead(list);
 
@@ -259,7 +259,7 @@ public:
 
 		void* allocate_base = address;
 		size_t region_size = size;
-		auto status = ZwFreeVirtualMemory(NtCurrentProcess(), &allocate_base, &region_size, MEM_RELEASE);
+		status = ZwFreeVirtualMemory(NtCurrentProcess(), &allocate_base, &region_size, MEM_RELEASE);
 
 		KeUnstackDetachProcess(&apc);
 		return status;
