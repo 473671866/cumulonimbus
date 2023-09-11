@@ -11,6 +11,7 @@
 //机器码
 //图标
 //窗口保护
+//etw hook
 
 NTSTATUS Controller(CommPackage* package)
 {

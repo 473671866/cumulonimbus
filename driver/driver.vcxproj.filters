@@ -32,6 +32,9 @@
     <Filter Include="capstone">
       <UniqueIdentifier>{2fda5a5d-5d8f-4e90-b151-0470e2b829ac}</UniqueIdentifier>
     </Filter>
+    <Filter Include="InfinityHook">
+      <UniqueIdentifier>{f02470eb-be1f-41e0-bd3f-3b3af12b889b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="standard\kernel_stl.cpp">
@@ -69,6 +72,12 @@
     </ClCompile>
     <ClCompile Include="window.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="global.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="InfinityHook\hook.cpp">
+      <Filter>InfinityHook</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -191,6 +200,21 @@
     </ClInclude>
     <ClInclude Include="window.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InfinityHook\headers.hpp">
+      <Filter>InfinityHook</Filter>
+    </ClInclude>
+    <ClInclude Include="InfinityHook\hook.h">
+      <Filter>InfinityHook</Filter>
+    </ClInclude>
+    <ClInclude Include="InfinityHook\imports.hpp">
+      <Filter>InfinityHook</Filter>
+    </ClInclude>
+    <ClInclude Include="InfinityHook\utils.hpp">
+      <Filter>InfinityHook</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
