@@ -377,7 +377,7 @@ namespace hook
 		{
 			PEPROCESS process = nullptr;
 			auto status = PsLookupProcessByProcessId(pid, &process);
-			auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+			auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 			if (!NT_SUCCESS(status)) {
 				LOG_WARN("process non existent");
 				return false;
@@ -390,7 +390,7 @@ namespace hook
 
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
-			auto detach = make_scope_exit([&apc] {KeUnstackDetachProcess(&apc)});
+			auto detach = std::experimental::make_scope_exit([&apc] {KeUnstackDetachProcess(&apc)});
 
 			uint64_t address = (uint64_t)function;
 			if (address == 0 || handler == nullptr || original == nullptr) {

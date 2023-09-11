@@ -25,19 +25,16 @@ boolean Launcher()
 	std::filesystem::path driverpath(std::string(temppath).append(filename).append(".sys"));
 	boolean success = loader::GenerateDriver(driverpath, load, sizeof(load));
 	if (!success) {
-		std::cerr << "Éú³ÉÇý¶¯Ê§°Ü\n";
 		goto unload;
 	}
 
 	success = loader::LoadDriver(driverpath, service_name);
 	if (!success) {
-		std::cerr << "¼ÓÔØÇý¶¯Ê§°Ü: " << GetLastError() << std::endl;
 		goto unload;
 	}
 
 	success = loader::MappingDriver(driver, sizeof(driver));
 	if (!success) {
-		std::cerr << "Ó³ÉäÇý¶¯Ê§°Ü\n";
 		goto unload;
 	}
 
@@ -102,6 +99,19 @@ boolean RecoverMemory(uint64_t address)
 	return SengMessageEx(Command::HideMemory, reinterpret_cast<void*>(address), sizeof(address));
 }
 
+void* AllocateMemory(uint64_t pid, size_t size, uint32_t proteced)
+{
+	MemoryPackage package{ .pid = pid, .address = 0, .size = size, .proteced = proteced };
+	SengMessageEx(Command::AllocateMemory, &package, sizeof(package));
+	return reinterpret_cast<void*>(package.address);
+}
+
+boolean FreeMemory(uint64_t pid, void* address, size_t size)
+{
+	MemoryPackage package{ .pid = pid, .address = (uint64_t)address, .size = size, .proteced = 0 };
+	return	SengMessageEx(Command::FreeMemory, &package, sizeof(package));
+}
+
 boolean HideProcess(uint64_t pid)
 {
 	return SengMessageEx(Command::HideProcess, reinterpret_cast<void*>(pid), sizeof(pid));
@@ -134,4 +144,9 @@ boolean WritePhysicalMemory(uint64_t pid, uint64_t address, void* buffer, size_t
 {
 	MemoryPackage package{ .pid = pid, .address = address, .buffer = reinterpret_cast<uint64_t>(buffer), .size = size };
 	return SengMessageEx(Command::WritePhysical, &package, sizeof(package));
+}
+
+boolean AntiSrceenShot(HWND hwnd)
+{
+	return SengMessageEx(Command::AntiScreenShot, hwnd, sizeof(HWND));
 }

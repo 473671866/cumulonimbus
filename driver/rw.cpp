@@ -5,21 +5,7 @@
 
 NTSTATUS ReadMappingMemory(HANDLE pid, void* address, void* buffer, size_t size)
 {
-	if (address > MmHighestUserAddress) {
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) >> (uint64_t)MmHighestUserAddress)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) < (uint64_t)address)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (buffer == nullptr || !MmIsAddressValid(buffer)) {
+	if (!utils::ProbeUserAddress(address, size, 1) || !utils::ProbeUserAddress(buffer, size, 1)) {
 		return STATUS_INVALID_ADDRESS;
 	}
 
@@ -46,9 +32,13 @@ NTSTATUS ReadMappingMemory(HANDLE pid, void* address, void* buffer, size_t size)
 
 NTSTATUS ReadPhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size)
 {
+	if (!utils::ProbeUserAddress(address, size, 1) || !utils::ProbeUserAddress(buffer, size, 1)) {
+		return STATUS_INVALID_ADDRESS;
+	}
+
 	PEPROCESS  process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
-	auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+	auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -56,24 +46,6 @@ NTSTATUS ReadPhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size
 	status = PsGetProcessExitStatus(process);
 	if (status != 0x103) {
 		return status;
-	}
-
-	if (address > MmHighestUserAddress) {
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) >> (uint64_t)MmHighestUserAddress)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) < (uint64_t)address)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (buffer == nullptr || !MmIsAddressValid(buffer)) {
-		return STATUS_INVALID_ADDRESS;
 	}
 
 	void* temp = utils::RtlAllocateMemory(PagedPool, size);
@@ -104,9 +76,13 @@ NTSTATUS ReadPhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size
 
 NTSTATUS WritePhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size)
 {
+	if (!utils::ProbeUserAddress(address, size, 1) || !utils::ProbeUserAddress(buffer, size, 1)) {
+		return STATUS_INVALID_ADDRESS;
+	}
+
 	PEPROCESS  process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
-	auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+	auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -114,24 +90,6 @@ NTSTATUS WritePhysicalMemory(HANDLE pid, void* address, void* buffer, size_t siz
 	status = PsGetProcessExitStatus(process);
 	if (status != 0x103) {
 		return status;
-	}
-
-	if (address > MmHighestUserAddress) {
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) >> (uint64_t)MmHighestUserAddress)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (((uint64_t)address + size) < (uint64_t)address)
-	{
-		return STATUS_INVALID_ADDRESS;
-	}
-
-	if (buffer == nullptr || !MmIsAddressValid(buffer)) {
-		return STATUS_INVALID_ADDRESS;
 	}
 
 	void* temp = utils::RtlAllocateMemory(PagedPool, size);

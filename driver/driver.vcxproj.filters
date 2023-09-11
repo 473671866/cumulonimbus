@@ -34,9 +34,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="standard\exit.cpp">
-      <Filter>standrad</Filter>
-    </ClCompile>
     <ClCompile Include="standard\kernel_stl.cpp">
       <Filter>standrad</Filter>
     </ClCompile>
@@ -70,6 +67,9 @@
     <ClCompile Include="rw.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils\hook.hpp">
@@ -93,7 +93,7 @@
     <ClInclude Include="standard\base.h">
       <Filter>standrad</Filter>
     </ClInclude>
-    <ClInclude Include="standard\exit.h">
+    <ClInclude Include="standard\spcoe_exit.hpp">
       <Filter>standrad</Filter>
     </ClInclude>
     <ClInclude Include="standard\ia32.h">
@@ -188,6 +188,9 @@
     </ClInclude>
     <ClInclude Include="pdb\analysis.h">
       <Filter>pdb</Filter>
+    </ClInclude>
+    <ClInclude Include="window.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

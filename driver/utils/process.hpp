@@ -29,7 +29,7 @@ public:
 
 		//打开节区
 		HANDLE hmemory = nullptr;
-		auto close_hmemory = make_scope_exit([hmemory] {if (hmemory)ZwClose(hmemory); });
+		auto close_hmemory = std::experimental::make_scope_exit([hmemory] {if (hmemory)ZwClose(hmemory); });
 		NTSTATUS status = ZwOpenSection(&hmemory, SECTION_ALL_ACCESS, &obj);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -37,7 +37,7 @@ public:
 
 		//获取节区对象
 		PVOID physical_memory_section = NULL;
-		auto dereference_physical_memory_section = make_scope_exit([physical_memory_section] {if (physical_memory_section)ObDereferenceObject(physical_memory_section); });
+		auto dereference_physical_memory_section = std::experimental::make_scope_exit([physical_memory_section] {if (physical_memory_section)ObDereferenceObject(physical_memory_section); });
 		status = ObReferenceObjectByHandle(hmemory, SECTION_ALL_ACCESS, NULL, KernelMode, &physical_memory_section, NULL);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -45,7 +45,7 @@ public:
 
 		//获取进程
 		PEPROCESS process = nullptr;
-		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 		status = PsLookupProcessByProcessId(pid, &process);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -103,7 +103,7 @@ public:
 
 		//打开节区
 		HANDLE hmemory = nullptr;
-		auto close_hmemory = make_scope_exit([hmemory] {if (hmemory)ZwClose(hmemory); });
+		auto close_hmemory = std::experimental::make_scope_exit([hmemory] {if (hmemory)ZwClose(hmemory); });
 		NTSTATUS status = ZwOpenSection(&hmemory, SECTION_ALL_ACCESS, &obj);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -111,7 +111,7 @@ public:
 
 		//获取节区对象
 		PVOID physical_memory_section = nullptr;
-		auto dereference_physical_memory_section = make_scope_exit([physical_memory_section] {if (physical_memory_section)ObDereferenceObject(physical_memory_section); });
+		auto dereference_physical_memory_section = std::experimental::make_scope_exit([physical_memory_section] {if (physical_memory_section)ObDereferenceObject(physical_memory_section); });
 		status = ObReferenceObjectByHandle(hmemory, SECTION_ALL_ACCESS, NULL, KernelMode, &physical_memory_section, NULL);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -170,46 +170,53 @@ public:
 		//取进程对象
 		PEPROCESS process = nullptr;
 		auto status = PsLookupProcessByProcessId(pid, &process);
-		if (NT_SUCCESS(status)) {
-			LOG_INFO("RemoveProcessEntryList\n");
-			//ActiveProcessLinks
-			analysis::Pdber ntos(L"ntoskrnl.exe");
-			ntos.init();
-
-			uint64_t ActiveProcessLinksOffset = ntos.GetOffset("_EPROCESS", "ActiveProcessLinks");
-			PLIST_ENTRY list = (PLIST_ENTRY)((char*)process + ActiveProcessLinksOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ProcessListEntry
-			uint64_t ProcessListEntryOffset = ntos.GetOffset("_KPROCESS", "ProcessListEntry");
-			list = (PLIST_ENTRY)((char*)process + ProcessListEntryOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ObjectTable
-			uint64_t ObjectTableOffset = ntos.GetOffset("_EPROCESS", "ObjectTable");
-			char* ObjectTable = (char*)*(void**)((char*)process + ObjectTableOffset);
-
-			//HandleTableList
-			uint64_t HandleTableListOffset = ntos.GetOffset("_HANDLE_TABLE", "HandleTableList");
-			list = (PLIST_ENTRY)((char*)ObjectTable + HandleTableListOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//PspCidTable
-			typedef PVOID(*ExpLookupHandleTableEntryProc)(PVOID PspCidTable, HANDLE ProcessId);
-			ExpLookupHandleTableEntryProc ExpLookupHandleTableEntry = reinterpret_cast<ExpLookupHandleTableEntryProc>(ntos.GetPointer("ExpLookupHandleTableEntry"));
-			PVOID PspCidTable = reinterpret_cast<PVOID>(ntos.GetPointer("PspCidTable"));
-			PVOID entry = ExpLookupHandleTableEntry(PspCidTable, pid);
-			if (MmIsAddressValid(entry)) {
-				RtlZeroMemory(entry, sizeof(entry));
-				uint64_t UniqueProcessIdOffset = ntos.GetOffset("_EPROCESS", "UniqueProcessId");
-				*(PHANDLE)((char*)process + UniqueProcessIdOffset) = 0;
-			}
-
-			ObDereferenceObject(process);
+		if (!NT_SUCCESS(status)) {
+			return status;
 		}
+
+		status = PsGetProcessExitStatus(process);
+		if (status != 0x103) {
+			ObDereferenceObject(process);
+			return status;
+		}
+
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		LOG_INFO("RemoveProcessEntryList\n");
+
+		//ActiveProcessLinks
+		uint64_t ActiveProcessLinksOffset = ntos->GetOffset("_EPROCESS", "ActiveProcessLinks");
+		PLIST_ENTRY list = (PLIST_ENTRY)((char*)process + ActiveProcessLinksOffset);
+		RemoveEntryList(list);
+		InitializeListHead(list);
+
+		//ProcessListEntry
+		uint64_t ProcessListEntryOffset = ntos->GetOffset("_KPROCESS", "ProcessListEntry");
+		list = (PLIST_ENTRY)((char*)process + ProcessListEntryOffset);
+		RemoveEntryList(list);
+		InitializeListHead(list);
+
+		//ObjectTable
+		uint64_t ObjectTableOffset = ntos->GetOffset("_EPROCESS", "ObjectTable");
+		char* ObjectTable = (char*)*(void**)((char*)process + ObjectTableOffset);
+
+		//HandleTableList
+		uint64_t HandleTableListOffset = ntos->GetOffset("_HANDLE_TABLE", "HandleTableList");
+		list = (PLIST_ENTRY)((char*)ObjectTable + HandleTableListOffset);
+		RemoveEntryList(list);
+		InitializeListHead(list);
+
+		//PspCidTable
+		typedef PVOID(*ExpLookupHandleTableEntryProc)(PVOID PspCidTable, HANDLE ProcessId);
+		ExpLookupHandleTableEntryProc ExpLookupHandleTableEntry = reinterpret_cast<ExpLookupHandleTableEntryProc>(ntos->GetPointer("ExpLookupHandleTableEntry"));
+		PVOID PspCidTable = reinterpret_cast<PVOID>(ntos->GetPointer("PspCidTable"));
+		PVOID entry = ExpLookupHandleTableEntry(PspCidTable, pid);
+		if (MmIsAddressValid(entry)) {
+			RtlZeroMemory(entry, sizeof(entry));
+			uint64_t UniqueProcessIdOffset = ntos->GetOffset("_EPROCESS", "UniqueProcessId");
+			*(PHANDLE)((char*)process + UniqueProcessIdOffset) = 0;
+		}
+
+		ObDereferenceObject(process);
 		return status;
 	}
 
@@ -217,7 +224,7 @@ public:
 	{
 		//获取进程
 		PEPROCESS process = nullptr;
-		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 		auto status = PsLookupProcessByProcessId(pid, &process);
 		if (!NT_SUCCESS(status)) {
 			return status;
@@ -244,7 +251,7 @@ public:
 	static NTSTATUS PsFreeMemory(HANDLE pid, void* address, size_t size)
 	{
 		PEPROCESS process = nullptr;
-		auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 		auto status = PsLookupProcessByProcessId(pid, &process);
 		if (!NT_SUCCESS(status)) {
 			return status;

@@ -24,8 +24,8 @@ NTSTATUS KdEnumerateDebuggingDevices(PVOID UnKnown1, PVOID UnKnown2, PVOID UnKno
 
 NTSTATUS Register(CommCallbackProc callback)
 {
-	analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
-	uint64_t address = ntos.GetPointer("NtConvertBetweenAuxiliaryCounterAndPerformanceCounter");
+	analysis::Pdber* ntos = analysis::Ntoskrnl();
+	uint64_t address = ntos->GetPointer("NtConvertBetweenAuxiliaryCounterAndPerformanceCounter");
 	if (address == 0 || !MmIsAddressValid((void*)address)) {
 		LOG_INFO("invaild address");
 		return STATUS_UNSUCCESSFUL;
@@ -51,8 +51,10 @@ NTSTATUS Register(CommCallbackProc callback)
 		LOG_INFO("comm register success\n");
 		return STATUS_SUCCESS;
 	}
+	else {
+		LOG_INFO("comm register failed\n");
+	}
 
-	LOG_INFO("comm register failed\n");
 	return STATUS_UNSUCCESSFUL;
 }
 

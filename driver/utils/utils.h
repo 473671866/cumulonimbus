@@ -22,6 +22,8 @@ namespace utils
 
 	void RtlFreeMemory(void* address);
 
+	boolean ProbeUserAddress(void* address, size_t size, unsigned __int32 alignment);
+
 	namespace ldr
 	{
 		PVOID GetApplicationModule(HANDLE process_id, PCHAR module_name, PSIZE_T image_size);

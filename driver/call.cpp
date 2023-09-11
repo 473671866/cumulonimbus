@@ -87,8 +87,8 @@ PsGetNextProcessThread(
 {
 	static PsGetNextProcessThreadProc proc = nullptr;
 	if (proc == nullptr) {
-		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
-		proc = reinterpret_cast<PsGetNextProcessThreadProc>(ntos.GetPointer("PsGetNextProcessThread"));
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		proc = reinterpret_cast<PsGetNextProcessThreadProc>(ntos->GetPointer("PsGetNextProcessThread"));
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(Process, Thread);
@@ -103,8 +103,8 @@ PsSuspendThread(
 	static PsSuspendThreadProc proc = nullptr;
 
 	if (proc == nullptr) {
-		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
-		proc = reinterpret_cast<PsSuspendThreadProc>(ntos.GetPointer("PsSuspendThread"));
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		proc = reinterpret_cast<PsSuspendThreadProc>(ntos->GetPointer("PsSuspendThread"));
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(Thread, PreviousSuspendCount);
@@ -119,8 +119,8 @@ PsResumeThread(
 	static PsResumeThreadProc proc = nullptr;
 
 	if (proc == nullptr) {
-		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
-		proc = reinterpret_cast<PsResumeThreadProc>(ntos.GetPointer("PsResumeThread"));
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		proc = reinterpret_cast<PsResumeThreadProc>(ntos->GetPointer("PsResumeThread"));
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(Thread, PreviousSuspendCount);
@@ -130,8 +130,8 @@ uint64_t GetTrapFrameOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
-		offset = ntos.GetOffset("_KTHREAD", "TrapFrame");
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		offset = ntos->GetOffset("_KTHREAD", "TrapFrame");
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -185,7 +185,7 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	//获取进程
 	PEPROCESS process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
-	auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+	auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -198,7 +198,7 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 	//获取主线程
 	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
-	auto dereference_thread = make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
+	auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 	if (thread == nullptr) {
 		return STATUS_THREAD_NOT_IN_PROCESS;
 	}
@@ -221,7 +221,7 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 
 	//申请内核内存
 	PVOID kernel_buffer = utils::RtlAllocateMemory(NonPagedPool, size);
-	auto free_kernel_buffer = make_scope_exit([=] {if (kernel_buffer)  utils::RtlFreeMemory(kernel_buffer); });
+	auto free_kernel_buffer = std::experimental::make_scope_exit([=] {if (kernel_buffer)  utils::RtlFreeMemory(kernel_buffer); });
 	if (!kernel_buffer) {
 		return STATUS_MEMORY_NOT_ALLOCATED;
 	}
@@ -233,7 +233,7 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	//附加
 	KAPC_STATE apc{};
 	KeStackAttachProcess(process, &apc);
-	auto detach = make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
+	auto detach = std::experimental::make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
 
 	//申请r3内存
 	PVOID user_buffer = 0;
@@ -353,7 +353,7 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 	//获取进程
 	PEPROCESS process = nullptr;
 	auto status = PsLookupProcessByProcessId(pid, &process);
-	auto dereference_process = make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+	auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 	if (!NT_SUCCESS(status)) {
 		return status;
 	}
@@ -366,7 +366,7 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 
 	//获取主线程
 	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
-	auto dereference_thread = make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
+	auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 	if (thread == nullptr) {
 		return STATUS_THREAD_NOT_IN_PROCESS;
 	}
@@ -384,7 +384,7 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 
 	KAPC_STATE apc{};
 	KeStackAttachProcess(process, &apc);
-	auto detach = make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
+	auto detach = std::experimental::make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
 
 	//dll文件内存
 	void* library_file_buffer = nullptr;

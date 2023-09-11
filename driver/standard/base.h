@@ -147,7 +147,7 @@ constexpr bool IsX64() {
 #include "stdcpp.h"
 #include "unique_resource.h"
 #include "import.h"
-#include "exit.h"
+#include "spcoe_exit.hpp"
 #include "log.h"
 #include "ia32.hpp"
 #endif

@@ -65,43 +65,42 @@ namespace utils
 
 	void* GetKernelModule(std::string module_name, size_t* size)
 	{
-		PRTL_PROCESS_MODULES modules = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag(PagedPool, sizeof(RTL_PROCESS_MODULES), 'size');
-		auto free_memory = make_scope_exit([modules] {	ExFreePoolWithTag(modules, 'size'); });
-		ULONG length = 0;
-		void* result = 0;
-
-		NTSTATUS status = ZwQuerySystemInformation(SystemModuleInformation, modules, sizeof(RTL_PROCESS_MODULES), &length);
-		if (status == STATUS_INFO_LENGTH_MISMATCH) {
-			ExFreePoolWithTag(modules, 'size');
-			modules = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag(PagedPool, length + sizeof(RTL_PROCESS_MODULES), 'size');
-			RtlZeroMemory(modules, length);
-		}
-
-		status = ZwQuerySystemInformation(SystemModuleInformation, modules, length + sizeof(RTL_PROCESS_MODULES), &length);
-		if (!NT_SUCCESS(status)) {
+		PRTL_PROCESS_MODULES modules = (PRTL_PROCESS_MODULES)RtlAllocateMemory(PagedPool, sizeof(RTL_PROCESS_MODULES));
+		if (modules == nullptr) {
 			return 0;
 		}
 
-		if (_stricmp(module_name.c_str(), "ntkrnlpa.exe") == 0 || _stricmp(module_name.c_str(), "ntoskrnl.exe") == 0) {
-			PRTL_PROCESS_MODULE_INFORMATION module_information = &(modules->Modules[0]);
-			result = module_information->ImageBase;
-			if (size) {
-				*size = module_information->ImageSize;
-			}
-			return result;
-		}
+		ULONG length = sizeof(RTL_PROCESS_MODULES);
+		void* result = 0;
+		NTSTATUS status = ZwQuerySystemInformation(SystemModuleInformation, modules, length, &length);
 
-		//遍历模块
-		for (size_t i = 0; i < modules->NumberOfModules; i++) {
-			PRTL_PROCESS_MODULE_INFORMATION module_information = &modules->Modules[i];
-			if (_stricmp((PCHAR)module_information->FullPathName, module_name.c_str())) {
-				result = module_information->ImageBase;
-				if (size) {
-					*size = module_information->ImageSize;
-				}
+		if (status == STATUS_INFO_LENGTH_MISMATCH) {
+			RtlFreeMemory(modules);
+			modules = (PRTL_PROCESS_MODULES)RtlAllocateMemory(PagedPool, length);
+			if (!modules) {
 				return result;
 			}
 		}
+
+		status = ZwQuerySystemInformation(SystemModuleInformation, modules, length, &length);
+		if (!NT_SUCCESS(status)) {
+			goto exit;
+		}
+
+		for (unsigned int i = 0; i < modules->NumberOfModules; i++)
+		{
+			PRTL_PROCESS_MODULE_INFORMATION module_infomation = &modules->Modules[i];
+			unsigned char* filename = module_infomation->FullPathName + module_infomation->OffsetToFileName;
+			if (_stricmp((char*)filename, module_name.c_str()) == 0) {
+				result = module_infomation->ImageBase;
+				if (size) {
+					*size = module_infomation->ImageSize;
+				}
+				break;
+			}
+		}
+	exit:
+		RtlFreeMemory(modules);
 		return result;
 	}
 
@@ -212,7 +211,7 @@ namespace utils
 		}
 
 		//获取文件大小
-		auto close_hfile = make_scope_exit([hfile] {ZwClose(hfile); });
+		auto close_hfile = std::experimental::make_scope_exit([hfile] {ZwClose(hfile); });
 		FILE_STANDARD_INFORMATION fileInfo;
 		status = ZwQueryInformationFile(hfile, &create_file_io_status, &fileInfo, sizeof(fileInfo), FileStandardInformation);
 		if (!NT_SUCCESS(status)) {
@@ -272,6 +271,29 @@ namespace utils
 			ExFreePoolWithTag(address, 'mem');
 		}
 		return;
+	}
+
+	boolean ProbeUserAddress(void* address, size_t size, unsigned __int32 alignment)
+	{
+		if (address == nullptr) {
+			return false;
+		}
+
+		if (size == 0) {
+			return true;
+		}
+
+		ULONG_PTR current = (ULONG_PTR)address;
+		if (((ULONG_PTR)address & (alignment - 1)) != 0) {
+			return false;
+		}
+
+		ULONG_PTR last = current + size - 1;
+		if ((last < current) || (last >= MmUserProbeAddress)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	namespace ldr
@@ -420,7 +442,7 @@ namespace utils
 			PVOID module_base_address = 0;
 			PEPROCESS process = nullptr;
 			NTSTATUS status = PsLookupProcessByProcessId(process_id, &process);
-			auto dereference_process = make_scope_exit([process] {if (process) ObDereferenceObject(process); });
+			auto dereference_process = std::experimental::make_scope_exit([process] {if (process) ObDereferenceObject(process); });
 			if (!NT_SUCCESS(status)) {
 				return 0;
 			}

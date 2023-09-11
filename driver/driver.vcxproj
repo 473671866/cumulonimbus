@@ -194,7 +194,6 @@
     <ClCompile Include="hde\hde32.cpp" />
     <ClCompile Include="hde\hde64.cpp" />
     <ClCompile Include="rw.cpp" />
-    <ClCompile Include="standard\exit.cpp" />
     <ClCompile Include="standard\kernel_stl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
@@ -205,6 +204,7 @@
     <ClCompile Include="standard\stdcpp.cpp" />
     <ClCompile Include="standard\typeinfo.cpp" />
     <ClCompile Include="utils\utils.cpp" />
+    <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="call.h" />
@@ -228,7 +228,7 @@
     <ClInclude Include="pdb\analysis.h" />
     <ClInclude Include="rw.h" />
     <ClInclude Include="standard\base.h" />
-    <ClInclude Include="standard\exit.h" />
+    <ClInclude Include="standard\spcoe_exit.hpp" />
     <ClInclude Include="standard\ia32.h" />
     <ClInclude Include="standard\ia32.hpp" />
     <ClInclude Include="standard\ia32_compact.h" />
@@ -261,6 +261,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="window.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="capstone\capstone_static_winkernel.pdb" />

@@ -19,20 +19,25 @@ void RtlFreePool(void* address)
 
 unsigned __int64* GetKenelModule(unsigned char* module_name, unsigned __int64* module_size)
 {
-	PRTL_PROCESS_MODULES modules = (PRTL_PROCESS_MODULES)RtlAllocatePool(PagedPool, sizeof(RTL_PROCESS_MODULES));
-	ULONG length = 0;
+	ULONG length = sizeof(RTL_PROCESS_MODULES);
 	void* result = 0;
-	NTSTATUS status = ZwQuerySystemInformation(SystemModuleInformation, modules, sizeof(RTL_PROCESS_MODULES), &length);
-
-	if (status == STATUS_INFO_LENGTH_MISMATCH) {
-		RtlFreePool(modules);
-		modules = RtlAllocatePool(PagedPool, length + sizeof(RTL_PROCESS_MODULES));
+	PRTL_PROCESS_MODULES modules = (PRTL_PROCESS_MODULES)RtlAllocatePool(PagedPool, length);
+	if (!modules) {
+		return 0;
 	}
 
-	status = ZwQuerySystemInformation(SystemModuleInformation, modules, length + sizeof(RTL_PROCESS_MODULES), &length);
-	if (!NT_SUCCESS(status)) {
+	NTSTATUS status = ZwQuerySystemInformation(SystemModuleInformation, modules, length, &length);
+	if (status == STATUS_INFO_LENGTH_MISMATCH) {
 		RtlFreePool(modules);
-		return 0;
+		modules = RtlAllocatePool(PagedPool, length);
+		if (!modules) {
+			return result;
+		}
+	}
+
+	status = ZwQuerySystemInformation(SystemModuleInformation, modules, length, &length);
+	if (!NT_SUCCESS(status)) {
+		goto exit;
 	}
 
 	for (unsigned int i = 0; i < modules->NumberOfModules; i++)
@@ -44,11 +49,11 @@ unsigned __int64* GetKenelModule(unsigned char* module_name, unsigned __int64* m
 			if (module_size) {
 				*module_size = module_infomation->ImageSize;
 			}
-			RtlFreePool(modules);
-			return result;
+			break;
 		}
 	}
 
+exit:
 	RtlFreePool(modules);
 	return result;
 }

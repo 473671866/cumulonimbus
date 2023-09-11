@@ -8,11 +8,14 @@ enum class  Command : uint64_t
 	Inject,
 	HideMemory,
 	RecovreMemory,
+	AllocateMemory,
+	FreeMemory,
 	HideProcess,
 	Module,
 	ReadMapping,
 	ReadPhysical,
-	WritePhysical
+	WritePhysical,
+	AntiScreenShot,
 };
 
 struct CommPackage
@@ -60,6 +63,7 @@ struct MemoryPackage
 	uint64_t address;
 	uint64_t buffer;
 	uint64_t size;
+	uint64_t proteced;
 };
 
 typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);
