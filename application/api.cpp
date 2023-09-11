@@ -85,7 +85,42 @@ boolean LoadLibrary_x64(uint64_t pid, const char* filepath)
 	}
 
 	InjectPackage package{ .pid = pid, .filebuffer = reinterpret_cast<uint64_t>(filebuffer), .filesize = filesize, .imagesize = nt_headers->OptionalHeader.SizeOfImage };
-	return SengMessageEx(Command::Inject, &package, sizeof(package));
+	return SengMessageEx(Command::LoadLibrary_x64, &package, sizeof(package));
+}
+
+boolean LoadLibrary_x86(uint64_t pid, const char* filepath)
+{
+	std::filesystem::path file_path(filepath);
+	if (!std::filesystem::exists(file_path)) {
+		return false;
+	}
+
+	std::ifstream stream(file_path, std::ios::binary);
+	auto stream_close = std::experimental::make_scope_exit([&] {stream.close(); });
+	if (!stream.is_open()) {
+		return false;
+	}
+
+	auto filesize = std::filesystem::file_size(file_path);
+	unsigned char* filebuffer = new unsigned char[filesize];
+	auto delete_filebuffer = std::experimental::make_scope_exit([filebuffer] {delete[] filebuffer; });
+	stream.read((char*)filebuffer, filesize);
+	if (stream.fail()) {
+		return false;
+	}
+
+	PIMAGE_DOS_HEADER dos_headers = reinterpret_cast<PIMAGE_DOS_HEADER>(filebuffer);
+	if (dos_headers->e_magic != IMAGE_DOS_SIGNATURE) {
+		return false;
+	}
+
+	PIMAGE_NT_HEADERS nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS>(dos_headers->e_lfanew + filebuffer);
+	if (nt_headers->Signature != IMAGE_NT_SIGNATURE || nt_headers->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+		return false;
+	}
+
+	InjectPackage package{ .pid = pid, .filebuffer = reinterpret_cast<uint64_t>(filebuffer), .filesize = filesize, .imagesize = nt_headers->OptionalHeader.SizeOfImage };
+	return SengMessageEx(Command::LoadLibrary_x86, &package, sizeof(package));
 }
 
 boolean HideMemory(uint64_t pid, uint64_t address, size_t size)
@@ -115,6 +150,11 @@ boolean FreeMemory(uint64_t pid, void* address, size_t size)
 boolean HideProcess(uint64_t pid)
 {
 	return SengMessageEx(Command::HideProcess, reinterpret_cast<void*>(pid), sizeof(pid));
+}
+
+boolean TermiateProcess(uint64_t pid)
+{
+	return SengMessageEx(Command::TerminateProcess, (void*)pid, sizeof(pid));
 }
 
 boolean GetApplicationModule(uint64_t pid, const char* module_name, void* address, size_t* size)

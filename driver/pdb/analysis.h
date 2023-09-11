@@ -28,4 +28,11 @@ namespace analysis {
 		static boolean success = win32kfull.init();
 		return &win32kfull;
 	}
+
+	inline Pdber* Win32k()
+	{
+		static analysis::Pdber win32k(L"win32k.sys");
+		static boolean success = win32k.init();
+		return &win32k;
+	}
 }

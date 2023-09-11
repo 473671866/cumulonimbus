@@ -6,13 +6,11 @@
 #include "utils/utils.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
-
 //TODO:
 //模块hook
 //机器码
 //图标
-//窗口
-//反截图
+//窗口保护
 
 NTSTATUS Controller(CommPackage* package)
 {
@@ -24,13 +22,28 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::Call: {
-		LOG_DEBUG("Call");
 		RemoteCallPackage* data = reinterpret_cast<RemoteCallPackage*>(package->buffer);
 		return RemoteCall((HANDLE)data->pid, (void*)data->shellcode, data->size);
 	}
 
-	case Command::Inject: {
-		LOG_DEBUG("Inject");
+	case Command::LoadLibrary_x64: {
+		InjectPackage* data = reinterpret_cast<InjectPackage*>(package->buffer);
+		if (!MmIsAddressValid(reinterpret_cast<void*>(data->filebuffer))) {
+			return STATUS_INVALID_ADDRESS;
+		}
+
+		void* filebuffer = utils::RtlAllocateMemory(PagedPool, data->filesize);
+		if (!filebuffer) {
+			return STATUS_MEMORY_NOT_ALLOCATED;
+		}
+
+		RtlCopyMemory(filebuffer, reinterpret_cast<void*>(data->filebuffer), data->filesize);
+		auto status = LoadLibrary_x64(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
+		utils::RtlFreeMemory(filebuffer);
+		return status;
+	}
+
+	case Command::LoadLibrary_x86: {
 		InjectPackage* data = reinterpret_cast<InjectPackage*>(package->buffer);
 		if (!MmIsAddressValid(reinterpret_cast<void*>(data->filebuffer))) {
 			return STATUS_INVALID_ADDRESS;
@@ -48,20 +61,17 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::HideMemory: {
-		LOG_DEBUG("HideMemory");
 		HideMemoryPackage* data = reinterpret_cast<HideMemoryPackage*>(package->buffer);
 		memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
 		return mem->HideMemory(reinterpret_cast<HANDLE>(data->pid), data->address, data->size);
 	}
 
 	case Command::RecovreMemory: {
-		LOG_DEBUG("RecovreMemory");
 		memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
 		return mem->RecovreMemory(package->buffer);
 	}
 
 	case Command::AllocateMemory: {
-		LOG_DEBUG("AllocateMemory");
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		void* address = nullptr;
 		auto status = ProcessUtils::PsAllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->proteced);
@@ -70,18 +80,15 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::FreeMemory: {
-		LOG_DEBUG("FreeMemory");
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		return ProcessUtils::PsFreeMemory((HANDLE)data->pid, (void*)data->address, data->size);
 	}
 
 	case Command::HideProcess: {
-		LOG_DEBUG("HideProcess");
 		return ProcessUtils::RemoveProcessEntryList(reinterpret_cast<HANDLE>(package->buffer));
 	}
 
 	case Command::Module: {
-		LOG_DEBUG("Module");
 		ModulePackage* data = reinterpret_cast<ModulePackage*>(package->buffer);
 		size_t size = 0;
 		uint64_t address = (uint64_t)utils::ldr::GetApplicationModule((HANDLE)data->pid, (char*)data->name, &size);
@@ -90,20 +97,21 @@ NTSTATUS Controller(CommPackage* package)
 		return address == 0 ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 	}
 
+	case Command::TerminateProcess: {
+		return ProcessUtils::PsTerminateProcess((HANDLE)package->buffer);
+	}
+
 	case Command::ReadMapping: {
-		LOG_DEBUG("ReadMapping");
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		return ReadMappingMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
 	}
 
 	case Command::ReadPhysical: {
-		LOG_DEBUG("ReadPhysical");
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		return ReadPhysicalMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
 	}
 
 	case Command::WritePhysical: {
-		LOG_DEBUG("WritePhysical");
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		return WritePhysicalMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
 	}
@@ -138,6 +146,6 @@ EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 	if (driver_object != nullptr) {
 		driver_object->DriverUnload = DriverUnload;
 	}
-	AntiScreenShot(nullptr);
+
 	return Register(Controller);
 }

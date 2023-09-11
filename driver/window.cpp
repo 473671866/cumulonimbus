@@ -3,9 +3,9 @@
 
 typedef BOOL(__fastcall* GreProtectSpriteContentProc)(LPVOID, HWND, INT, UINT);
 
-boolean AntiScreenShot(HWND hwnd)
+BOOL AntiScreenShot(HWND hwnd)
 {
-	boolean success = false;
+	BOOL success = false;
 	PEPROCESS process = nullptr;
 	auto status = utils::LookupProcessByImageFileName("explorer.exe", &process);
 	if (NT_SUCCESS(status)) {

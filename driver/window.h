@@ -2,4 +2,4 @@
 #include "standard/base.h"
 #include "pdb/analysis.h"
 
-boolean AntiScreenShot(HWND hwnd);
+BOOL AntiScreenShot(HWND hwnd);

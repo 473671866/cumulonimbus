@@ -79,6 +79,20 @@ NTSTATUS
 	OUT PULONG PreviousSuspendCount OPTIONAL
 	);
 
+typedef NTSTATUS(NTAPI* ZwCreateThreadExProc)(
+	OUT PHANDLE ThreadHandle,
+	IN ACCESS_MASK DesiredAccess,
+	IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+	IN HANDLE ProcessHandle,
+	IN PVOID StartRoutine,
+	IN PVOID StartContext,
+	IN ULONG CreateThreadFlags,
+	IN SIZE_T ZeroBits OPTIONAL,
+	IN SIZE_T StackSize OPTIONAL,
+	IN SIZE_T MaximumStackSize OPTIONAL,
+	IN PVOID AttributeList
+	);
+
 PETHREAD
 PsGetNextProcessThread(
 	IN PEPROCESS Process,
@@ -126,12 +140,80 @@ PsResumeThread(
 	return proc(Thread, PreviousSuspendCount);
 }
 
+NTSTATUS ZwCreateThreadEx(
+	OUT PHANDLE ThreadHandle,
+	IN ACCESS_MASK DesiredAccess,
+	IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+	IN HANDLE ProcessHandle,
+	IN PVOID StartRoutine,
+	IN PVOID StartContext,
+	IN ULONG CreateThreadFlags,
+	IN SIZE_T ZeroBits OPTIONAL,
+	IN SIZE_T StackSize OPTIONAL,
+	IN SIZE_T MaximumStackSize OPTIONAL,
+	IN PVOID AttributeList
+)
+{
+	static ZwCreateThreadExProc proc = nullptr;
+
+	if (proc == nullptr) {
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		proc = reinterpret_cast<ZwCreateThreadExProc>(ntos->GetPointer("ZwCreateThreadEx"));
+		LOG_INFO("proc: %llx", proc);
+	}
+	return proc(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, StartRoutine, StartContext, CreateThreadFlags, ZeroBits, StackSize, MaximumStackSize, AttributeList);
+}
+
 uint64_t GetTrapFrameOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
 		analysis::Pdber* ntos = analysis::Ntoskrnl();
 		offset = ntos->GetOffset("_KTHREAD", "TrapFrame");
+		LOG_INFO("offset: %llx", offset);
+	}
+	return offset;
+}
+
+uint64_t GetThreadIdOffset()
+{
+	static uint64_t offset = 0;
+	if (offset == 0) {
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		offset = ntos->GetOffset("_ETHREAD", "Cid");
+		LOG_INFO("offset: %llx", offset);
+	}
+	return offset;
+}
+
+uint64_t GetStartAddressOffset()
+{
+	static uint64_t offset = 0;
+	if (offset == 0) {
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		offset = ntos->GetOffset("_ETHREAD", "StartAddress");
+		LOG_INFO("offset: %llx", offset);
+	}
+	return offset;
+}
+
+uint64_t GetWin32StartAddressOffset()
+{
+	static uint64_t offset = 0;
+	if (offset == 0) {
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		offset = ntos->GetOffset("_ETHREAD", "Win32StartAddress");
+		LOG_INFO("offset: %llx", offset);
+	}
+	return offset;
+}
+
+uint64_t GetThreadListOffset()
+{
+	static uint64_t offset = 0;
+	if (offset == 0) {
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		offset = ntos->GetOffset("_ETHREAD", "ThreadListEntry");
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -268,12 +350,12 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 			0x00, 0x00,
 		};
 		char* teb = reinterpret_cast<char*>(PsGetThreadTeb(thread));
-		CONTEXT_x86* context = reinterpret_cast<CONTEXT_x86*>(((char*)*(uint64_t*)(teb + 0x1488) + 4));	//wow64 context
+		PUCHAR context = (PUCHAR) * (PULONG64)(teb + 0x1488);
 		*(uint32_t*)&x86_buffer[2] = (uint32_t)shell_code_buffer;										//shellcode
 		*(uint32_t*)&x86_buffer[15] = ((uint32_t)user_buffer + 0x500);									//flags
-		*(uint32_t*)&x86_buffer[32] = context->Eip;														//ret
+		*(uint32_t*)&x86_buffer[32] = *(PULONG)(context + 0xbc);										//ret
 		RtlCopyMemory(user_buffer, x86_buffer, sizeof(x86_buffer));										//注入
-		context->Eip = reinterpret_cast<uint32_t>(user_buffer);											//修改eip
+		*(uint32_t*)(context + 0xbc) = reinterpret_cast<uint32_t>(user_buffer);							//修改eip
 	}
 	else {
 		uint8_t x64_buffer[] =
@@ -524,3 +606,293 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 	ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
 	return status;
 }
+
+NTSTATUS LoadLibrary_x86(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
+{
+	PEPROCESS process = nullptr;
+	auto status = PsLookupProcessByProcessId(pid, &process);
+	auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
+	KAPC_STATE apc{};
+	KeStackAttachProcess(process, &apc);
+	auto detach = std::experimental::make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
+
+	//文件内存
+	size_t regionsize = filesize;
+	void* filebase = nullptr;
+	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &filebase, 0, &regionsize, MEM_COMMIT, PAGE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		KeUnstackDetachProcess(&apc);
+		return status;
+	}
+
+	//运行内存
+	size_t image_region = imagesize;
+	void* imagebuffer = nullptr;
+	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &imagebuffer, 0, &image_region, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+		KeUnstackDetachProcess(&apc);
+		return status;
+	}
+
+	//shellcode内存
+	size_t shellcode_region_size = sizeof(MemLoadShellcode_x86);
+	uint8_t* shellcodebuffer = nullptr;
+	status = ZwAllocateVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, 0, &shellcode_region_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), &imagebuffer, &image_region, MEM_RELEASE);
+		KeUnstackDetachProcess(&apc);
+		return status;
+	}
+
+	RtlZeroMemory(imagebuffer, imagesize);
+
+	RtlZeroMemory(filebase, regionsize);
+	RtlCopyMemory(filebase, filebuffer, filesize);
+
+	RtlZeroMemory(shellcodebuffer, shellcode_region_size);
+	RtlCopyMemory(shellcodebuffer, MemLoadShellcode_x86, sizeof(MemLoadShellcode_x86));
+
+#pragma warning(push)
+#pragma warning(disable:4311)
+#pragma warning(disable:4302)
+	shellcodebuffer[0x337] = 0x90;
+	shellcodebuffer[0x338] = 0x90;
+	shellcodebuffer[0x339] = 0x90;
+	shellcodebuffer[0x33a] = 0x90;
+	shellcodebuffer[0x33b] = 0x90;
+	shellcodebuffer[0x33c] = 0x90;
+	shellcodebuffer[0x33d] = 0x90;
+	shellcodebuffer[0x33e] = 0x90;
+	shellcodebuffer[0x33f] = 0x90;
+	shellcodebuffer[0x340] = 0x90;
+	shellcodebuffer[0x341] = 0x90;
+	shellcodebuffer[0x342] = 0x90;
+	shellcodebuffer[0x343] = 0x90;
+	shellcodebuffer[0x344] = 0x90;
+	shellcodebuffer[0x345] = 0x90;
+	shellcodebuffer[0x346] = 0x90;
+	shellcodebuffer[0x347] = 0x90;
+	shellcodebuffer[0x348] = 0x90;
+	shellcodebuffer[0x349] = 0x90;
+	shellcodebuffer[0x337] = 0xb8;
+	*(uint32_t*)&shellcodebuffer[0x338] = (uint32_t)imagebuffer;
+
+#pragma warning(pop)
+
+	HANDLE hthread = nullptr;
+	auto hthread_close = std::experimental::make_scope_exit([hthread] {if (hthread)ZwClose(hthread); });
+	status = ZwCreateThreadEx(&hthread, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), shellcodebuffer, filebase, 0, 0, 0x100000, 0x200000, NULL);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
+	}
+
+	PETHREAD thread = nullptr;
+	auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
+	status = ObReferenceObjectByHandle(hthread, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, (void**)&thread, NULL);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
+	}
+
+	KeWaitForSingleObject(thread, Executive, KernelMode, FALSE, NULL);
+
+	//隐藏内存
+	status = memory::MemoryUtils::get_instance()->HideMemory(imagebuffer, image_region);
+	if (!NT_SUCCESS(status)) {
+		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
+	}
+
+	//隐藏线程
+	uint64_t ModuleAddress = (uint64_t)PsGetProcessSectionBaseAddress(process);
+	uint64_t StartAddresOffset = GetStartAddressOffset();
+	uint64_t Win32StartAddresOffset = GetWin32StartAddressOffset();
+	PLIST_ENTRY ThreadList = (PLIST_ENTRY)((PUCHAR)thread + GetThreadListOffset());
+	if (ModuleAddress && StartAddresOffset && Win32StartAddresOffset && ThreadList) {
+		*(PULONG64)((PUCHAR)thread + StartAddresOffset) = ModuleAddress + 1000;
+		*(PULONG64)((PUCHAR)thread + Win32StartAddresOffset) = ModuleAddress + 2000;
+		RemoveEntryList(ThreadList);
+		InitializeListHead(ThreadList);
+	}
+
+	ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+	ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
+	return status;
+}
+
+//NTSTATUS LoadLibrary_x86(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
+//{
+//	PEPROCESS process = nullptr;
+//	auto status = PsLookupProcessByProcessId(pid, &process);
+//	auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+//	if (!NT_SUCCESS(status)) {
+//		return status;
+//	}
+//
+//	//获取主线程
+//	PETHREAD  thread = PsGetNextProcessThread(process, nullptr);
+//	auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
+//	if (thread == nullptr) {
+//		return STATUS_THREAD_NOT_IN_PROCESS;
+//	}
+//
+//	if (PsGetThreadExitStatus(thread) != 0x103)
+//	{
+//		return STATUS_THREAD_IS_TERMINATING;
+//	}
+//
+//	KAPC_STATE apc{};
+//	KeStackAttachProcess(process, &apc);
+//	auto detach = std::experimental::make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
+//
+//	//挂起线程
+//	status = PsSuspendThread(thread, nullptr);
+//	if (!NT_SUCCESS(status)) {
+//		return status;
+//	}
+//
+//	//文件内存
+//	size_t regionsize = filesize;
+//	void* filebase = nullptr;
+//	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &filebase, 0, &regionsize, MEM_COMMIT, PAGE_READWRITE);
+//	if (!NT_SUCCESS(status)) {
+//		KeUnstackDetachProcess(&apc);
+//		return status;
+//	}
+//
+//	//运行内存
+//	size_t image_region = imagesize;
+//	void* imagebuffer = nullptr;
+//	status = ZwAllocateVirtualMemory(NtCurrentProcess(), &imagebuffer, 0, &image_region, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+//	if (!NT_SUCCESS(status)) {
+//		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+//		KeUnstackDetachProcess(&apc);
+//		return status;
+//	}
+//
+//	//shellcode内存
+//	size_t shellcode_region_size = sizeof(MemLoadShellcode_x86) + PAGE_SIZE;
+//	uint8_t* shellcodebuffer = nullptr;
+//	status = ZwAllocateVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, 0, &shellcode_region_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+//	if (!NT_SUCCESS(status)) {
+//		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+//		ZwFreeVirtualMemory(NtCurrentProcess(), &imagebuffer, &image_region, MEM_RELEASE);
+//		KeUnstackDetachProcess(&apc);
+//		return status;
+//	}
+//
+//	uint8_t* execute = shellcodebuffer + PAGE_SIZE;
+//	uint8_t* flags = shellcodebuffer + 0x500;
+//	RtlZeroMemory(imagebuffer, imagesize);
+//
+//	RtlZeroMemory(filebase, regionsize);
+//	RtlCopyMemory(filebase, filebuffer, filesize);
+//
+//	RtlZeroMemory(shellcodebuffer, shellcode_region_size);
+//	RtlCopyMemory(execute, MemLoadShellcode_x86, sizeof(MemLoadShellcode_x86));
+//
+//#pragma warning(push)
+//#pragma warning(disable:4311)
+//#pragma warning(disable:4302)
+//
+//	uint8_t x86_buffer[]
+//	{
+//		0x60,									//60              pushad
+//		0xB8, 0x78, 0x56, 0x34, 0x12,			//B8 78563412     mov eax,12345678
+//		0xBB, 0x78, 0x56, 0x34, 0x12,			//				  mov ebx,12345678
+//		0x83, 0xEC, 0x40,						//83EC 40         sub esp,40
+//		0xFF, 0xD3,								//FFD0            call ebx
+//		0x83, 0xC4, 0x40,						//83C4 40         add esp,40
+//		0xB8, 0x78, 0x56, 0x34, 0x12,			//B8 78563412     mov eax,12345678
+//		0xC7, 0x00,	0x01, 0x00, 0x00,0x00,		//C700 01000000   mov dword ptr ds : [eax] ,1
+//		0x61,									//61              popad
+//		0xFF, 0x25, 0x00, 0x00, 0x00, 0x00,		//FF25 00000000   jmp dword ptr ds:[0]
+//		0x00, 0x00,
+//		0x00, 0x00,
+//		0x00, 0x00,
+//		0x00, 0x00,
+//	};
+//	char* teb = reinterpret_cast<char*>(PsGetThreadTeb(thread));
+//	CONTEXT_x86* context = reinterpret_cast<CONTEXT_x86*>(((char*)*(uint64_t*)(teb + 0x1488) + 4));	//wow64 context
+//	shellcodebuffer[0x337] = 0x90;
+//	shellcodebuffer[0x338] = 0x90;
+//	shellcodebuffer[0x339] = 0x90;
+//	shellcodebuffer[0x33a] = 0x90;
+//	shellcodebuffer[0x33b] = 0x90;
+//	shellcodebuffer[0x33c] = 0x90;
+//	shellcodebuffer[0x33d] = 0x90;
+//	shellcodebuffer[0x33e] = 0x90;
+//	shellcodebuffer[0x33f] = 0x90;
+//	shellcodebuffer[0x340] = 0x90;
+//	shellcodebuffer[0x341] = 0x90;
+//	shellcodebuffer[0x342] = 0x90;
+//	shellcodebuffer[0x343] = 0x90;
+//	shellcodebuffer[0x344] = 0x90;
+//	shellcodebuffer[0x345] = 0x90;
+//	shellcodebuffer[0x346] = 0x90;
+//	shellcodebuffer[0x347] = 0x90;
+//	shellcodebuffer[0x348] = 0x90;
+//	shellcodebuffer[0x349] = 0x90;
+//	shellcodebuffer[0x337] = 0xb8;
+//	*(uint32_t*)&shellcodebuffer[0x338] = (uint32_t)imagebuffer;
+//	*(uint32_t*)&x86_buffer[2] = (uint32_t)filebase;												//shellcode
+//	*(uint32_t*)&x86_buffer[7] = (uint32_t)execute;													//shellcode
+//	*(uint32_t*)&x86_buffer[20] = ((uint32_t)flags);												//flags
+//	*(uint32_t*)&x86_buffer[38] = context->Eip;														//ret
+//	RtlCopyMemory(shellcodebuffer, x86_buffer, sizeof(x86_buffer));									//注入
+//	context->Eip = reinterpret_cast<uint32_t>(shellcodebuffer);										//修改eip
+//	DbgBreakPoint();
+//#pragma warning(pop)
+//
+//	//恢复线程
+//	status = PsResumeThread(thread, nullptr);
+//	if (!NT_SUCCESS(status)) {
+//		ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+//		ZwFreeVirtualMemory(NtCurrentProcess(), &imagebuffer, &image_region, MEM_RELEASE);
+//		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
+//		KeUnstackDetachProcess(&apc);
+//		return status;
+//	}
+//
+//	LARGE_INTEGER time{ .QuadPart = 10 * -10000 };
+//	uint32_t complete = 0;
+//	boolean success = true;
+//
+//	for (int i = 0; i < 10000; i++) {
+//		if (PsGetProcessExitStatus(process) != 0x103) {
+//			return STATUS_PROCESS_IS_TERMINATING;
+//		}
+//		//读取标记
+//		RtlCopyMemory(&complete, flags, 4);
+//		if (complete == 1) {
+//			success = true;
+//			break;
+//		}
+//		KeDelayExecutionThread(KernelMode, false, &time);
+//	}
+//
+//	if (success) {
+//		//隐藏内存
+//		status = memory::MemoryUtils::get_instance()->HideMemory(imagebuffer, image_region);
+//		if (!NT_SUCCESS(status)) {
+//			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
+//		}
+//	}
+//	else {
+//		ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
+//	}
+//
+//	ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
+//	ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
+//
+//	KeUnstackDetachProcess(&apc);
+//	return status;
+//}
