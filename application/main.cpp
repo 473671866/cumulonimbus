@@ -1,8 +1,6 @@
 #include <iostream>
 #include <windows.h>
 #include <TlHelp32.h>
-#include <random>
-#include <ctime>
 #include "api.h"
 
 DWORD GetPid()
@@ -28,41 +26,95 @@ DWORD GetPid()
 	return 0;
 }
 
-int main(int arg, char** argv)
+int main()
 {
+	int code = 0;
+	HMODULE hmodule = LoadLibraryA("library.dll");
+	if (!hmodule) {
+		code = GetLastError();
+		std::cout << "加载模块失败: " << code << "\n";
+		system("pause");
+		return 0;
+	}
+	else {
+		std::cout << "加载模块成功\n";
+	}
+
 	//加载驱动
-	//if (!Launcher()) {
+	LauncherProc Launcher = (LauncherProc)GetProcAddress(hmodule, "Launcher");
+	code = Launcher();
+	if (code != 0) {
+		std::cerr << "加载驱动失败, 错误代码: " << code << "\n";
+		system("pause");
+	}
+	else {
+		std::cout << "加载驱动成功\n";
+	}
+
+	//RegisterKeyProc RegisterKey = (RegisterKeyProc)GetProcAddress(hmodule, "RegisterKey");
+	//QueryProc Query = (QueryProc)GetProcAddress(hmodule, "Query");
+	//ExamineProc Examine = (ExamineProc)GetProcAddress(hmodule, "Examine");
+
+	//InitializeWindowProtectedProc InitializeWindowProtected = (InitializeWindowProtectedProc)GetProcAddress(hmodule, "InitializeWindowProtected");
+	//InstallWindowProtectProc InstallWindowProtect = (InstallWindowProtectProc)GetProcAddress(hmodule, "InstallWindowProtect");
+	//UnloadWindowProtectedProc UnloadWindowProtected = (UnloadWindowProtectedProc)GetProcAddress(hmodule, "UnloadWindowProtected");
+
+	auto pid = GetPid();
+
+	////模块
+	//system("pause");
+	//unsigned __int64 module_address = 0;
+	//GetApplicationModuleProc GetApplicationModule = (GetApplicationModuleProc)GetProcAddress(hmodule, "GetApplicationModule");
+	//bool success = GetApplicationModule(pid, "Project1.exe", &module_address, nullptr);
+	//if (success || module_address) {
+	//	std::cout << "模块地址: " << (void*)module_address << "\n";
+	//}
+	//else {
+	//	std::cerr << "获取模块失败\n";
 	//	system("pause");
 	//}
 
-	//auto hwnd = FindWindowA(NULL, "Cheat Engine 7.4");
+	//system("pause");
+	////读
+	//unsigned __int64 address = 0x7ff7d7277000;
+	//unsigned __int64 mapping = 0;
+	//ReadMappingMemoryProc ReadMappingMemory = (ReadMappingMemoryProc)GetProcAddress(hmodule, "ReadMappingMemory");
+	//success = ReadMappingMemory(pid, address, &mapping, 8);
+	//if (success) {
+	//	std::cout << "ReadMappingMemory 读取结果: " << mapping << "\n";
+	//}
+	//else {
+	//	std::cerr << "ReadMappingMemory 读取失败 " << mapping << "\n";
+	//	system("pause");
+	//}
 
-	//DWORD pid = 0;
-	//GetWindowThreadProcessId(hwnd, &pid);
+	//system("pause");
+	//unsigned __int64 physical = 0;
+	//ReadPhysicalMemoryProc ReadPhysicalMemory = (ReadPhysicalMemoryProc)GetProcAddress(hmodule, "ReadPhysicalMemory");
+	//success = ReadPhysicalMemory(pid, address, &physical, 8);
+	//if (success) {
+	//	std::cout << "ReadPhysicalMemory 读取结果: " << physical << "\n";
+	//}
+	//else {
+	//	std::cerr << "ReadPhysicalMemory 读取失败\n" << physical << "\n";;
+	//	system("pause");
+	//}
 
-		//取模块
-		//uint64_t base = 0;
-		//boolean success = GetApplicationModule(pid, "Project1.exe", &base, nullptr);
-		//if (!success || !base) {
-		//	std::cerr << "获取模块失败\n";
-		//}
+	//system("pause");
+	////写
+	//unsigned __int64 write = 555555;
+	//WritePhysicalMemoryProc WritePhysicalMemory = (WritePhysicalMemoryProc)GetProcAddress(hmodule, "WritePhysicalMemory");
+	//success = WritePhysicalMemory(pid, address, &write, 8);
+	//if (success) {
+	//	std::cout << "写入成功\n";
+	//}
+	//else {
+	//	std::cerr << "写入失败\n";
+	//}
 
-		//读内存
-		//uint64_t address = 0x15a000 + base;
-		//uint64_t result = 0;
-		//ReadMappingMemory(pid, address, &result, sizeof(result));
-		//std::cout << "读: " << result << std::endl;
-		//uint64_t calladdress = base + 0xe6f0;
-
-		//写内存
-		//result = 123456;
-		//WritePhysicalMemory(pid, address, &result, sizeof(uint64_t));
-
-	//远程call
-	//HMODULE hmodule = LoadLibraryA("user32.dll");
-	//uint64_t msg = (uint64_t)GetProcAddress(hmodule, "MessageBoxA");
-	//uint8_t buffer[]
-	//{
+	//system("pause");
+	////x64call
+	//unsigned __int8 x64buffer[]{
 	//	0x31, 0xC9,													//xor rcx, rcx
 	//	0x31, 0xD2,													//xor rdx, rdx
 	//	0x4D, 0x31, 0xC0,											//xor r8, r8
@@ -71,35 +123,136 @@ int main(int arg, char** argv)
 	//	0x48, 0x81, 0xEC, 0xA8, 0x00, 0x00, 0x00,					//sup rsp, 0xa8
 	//	0xFF, 0xD0,													//call rax
 	//	0x48, 0x81, 0xC4, 0xA8, 0x00, 0x00, 0x00,					//add rsp, 0xa8
-	//	0xC3														//ret
+	//	0xC3
 	//};
-	//*(uint64_t*)&buffer[12] = msg;
-	//RemoteCall(pid, buffer, sizeof(buffer));
 
-	//隐藏进程
-	//HideProcess(pid);
+	//*(unsigned __int64*)&x64buffer[12] = 0x7ff7d71b1000;
+	//RemoteCallProc RemoteCall = (RemoteCallProc)GetProcAddress(hmodule, "RemoteCall");
+	//success = RemoteCall(pid, x64buffer, sizeof(x64buffer));
+	//if (success) {
+	//	std::cout << "RemoteCall成功\n";
+	//}
+	//else {
+	//	std::cerr << "RemoteCall失败\n";
+	//}
 
-	//结束进程
-	//TermiateProcess(pid);
+	//system("pause");
+	////x64注入
+	//LoadLibrary_x64Proc LoadLibrary_x64 = (LoadLibrary_x64Proc)GetProcAddress(hmodule, "LoadLibrary_x64");
+	//success = LoadLibrary_x64(pid, "C:\\Users\\ljw-cccc\\Desktop\\dll.dll");
+	//if (success) {
+	//	std::cout << "x64注入成功\n";
+	//}
+	//else {
+	//	std::cerr << "x64注入失败\n";
+	//}
 
+	//system("pause");
+	////申请内存
+	//AllocateMemoryProc AllocateMemory = (AllocateMemoryProc)GetProcAddress(hmodule, "AllocateMemory");
+	//void* mem = AllocateMemory(pid, 0x1000, PAGE_EXECUTE_READWRITE);
+	//if (mem) {
+	//	std::cout << "申请内存成功: " << mem << "\n";
+	//}
+	//else {
+	//	std::cerr << "申请内存失败\n";
+	//}
+
+	//system("pause");
+	////隐藏内存
+	//HideMemoryProc HideMemory = (HideMemoryProc)GetProcAddress(hmodule, "HideMemory");
+	//success = HideMemory(pid, mem, 0x1000);
+	//if (success) {
+	//	std::cout << "隐藏内存成功: " << mem << "\n";
+	//}
+	//else {
+	//	std::cerr << "隐藏内存失败\n";
+	//}
+
+	//system("pause");
+	////恢复被隐藏的内存
+	//RecoverMemoryProc RecoverMemory = (RecoverMemoryProc)GetProcAddress(hmodule, "RecoverMemory");
+	//success = RecoverMemory(pid, mem, 0);
+	//if (success) {
+	//	std::cout << "恢复隐藏内存成功: " << mem << "\n";
+	//}
+	//else {
+	//	std::cerr << "恢复隐藏内存失败\n";
+	//}
+
+	//system("pause");
+	////释放内存
+	//FreeMemoryProc FreeMemory = (FreeMemoryProc)GetProcAddress(hmodule, "FreeMemory");
+	//success = FreeMemory(pid, mem, 0x1000);
+	//if (success) {
+	//	std::cout << "释放内存成功: " << mem << "\n";
+	//}
+	//else {
+	//	std::cerr << "释放内存失败\n";
+	//}
+	//system("pause");
+	////隐藏进程
+	//HideProcessProc HideProcess = (HideProcessProc)GetProcAddress(hmodule, "HideProcess");
+	//success = HideProcess(pid);
+	//if (success) {
+	//	std::cout << "隐藏进程成功: " << mem << "\n";
+	//}
+	//else {
+	//	std::cerr << "隐藏进程失败\n";
+	//}
+
+	//system("pause");
+	////结束进程
+	//TermiateProcessProc TermiateProcess = (TermiateProcessProc)GetProcAddress(hmodule, "TermiateProcess");
+	//success = TermiateProcess(pid);
+	//if (success) {
+	//	std::cout << "结束进程成功: " << mem << "\n";
+	//}
+	//else {
+	//	std::cerr << "结束进程失败\n";
+	//}
+
+	//system("pause");
 	//反截图
-	//AntiSrceenShot(hwnd);
+	//HWND hwnd = FindWindowA(NULL, "Cheat Engine 7.4");
+	//if (hwnd) {
+	//	std::cout << "获取窗口句柄成功\n";
+	//	AntiSrceenShotProc AntiSrceenShot = (AntiSrceenShotProc)GetProcAddress(hmodule, "AntiSrceenShot");
+	//	AntiSrceenShot(hwnd);
+	//}
+	//else {
+	//	std::cerr << "获取窗口句柄失败\n";
+	//}
 
-	//申请内存
-	//auto address = AllocateMemory(pid, 0x1000, PAGE_EXECUTE_READWRITE);
+	////=====================================x86=======================================
+	////x86注入
+	//LoadLibrary_x86Proc LoadLibrary_x86 = (LoadLibrary_x86Proc)GetProcAddress(hmodule, "LoadLibrary_x86");
+	//auto success = LoadLibrary_x86(pid, "C:\\Users\\ljw-cccc\\Desktop\\dll.dll");
+	//if (success) {
+	//	std::cout << "x86注入成功\n";
+	//}
+	//else {
+	//	std::cerr << "x86注入失败\n";
+	//}
 
-	//隐藏内存
-	//HideMemory(pid, address, 0x1000);
+	////x86call
+	//RemoteCallProc RemoteCall = (RemoteCallProc)GetProcAddress(hmodule, "RemoteCall");
+	//unsigned __int8 x86_buffer[] = {
+	//	0xB8, 0x78, 0x56, 0x34, 0x12, //mov eax, 0x12345678
+	//	0x83, 0xEC, 0xa0,			  //sub esp, 0x40
+	//	0xFF,0xD0,					  //call eax
+	//	0x83,0xC4, 0xa0,			  //add esp, 0x40
+	//	0xC3						  //ret
+	//};
 
-	//恢复被隐藏的内存
-	//RecoverMemory(address);
-
-	//释放内存
-	//FreeMemory(pid, address, 0x1000);
-
-	//注入
-	//LoadLibrary_x64(pid, "F:\\Code\\Kernel\\cumolonimbus\\x64\\Release\\Dll.dll");
-	//LoadLibrary_x86(pid, "F:\\Code\\Kernel\\cumolonimbus\\x64\\Release\\Dll.dll");
+	//*(unsigned __int32*)&x86_buffer[1] = 0x621000;
+	//success = RemoteCall(pid, x86_buffer, sizeof(x86_buffer));
+	//if (success) {
+	//	std::cout << "RemoteCall成功\n";
+	//}
+	//else {
+	//	std::cerr << "RemoteCall失败\n";
+	//}
 
 	system("pause");
 	return 0;

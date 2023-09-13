@@ -13,7 +13,7 @@ set "path=%path%;D:/vmp/;"
 
 @ram VMProtect_Con.exe %VMPath%
 D:\DSignTool\CSignTool.exe sign /r landong /f %SignFullPath% /ac
-builder.exe %SignFullPath% F:\Code\Kernel\cumolonimbus\application
+builder.exe %SignFullPath% F:\Code\Kernel\cumolonimbus\library
 
 date %d%
 pause

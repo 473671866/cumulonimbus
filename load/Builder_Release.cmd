@@ -10,7 +10,7 @@ cd %projectpath%
 set "SignFullPath=%preProjectpath%\x64\Release\load.sys"
 
 D:\DSignTool\CSignTool.exe sign /r landong /f %SignFullPath% /ac
-builder.exe %SignFullPath% F:\Code\Kernel\cumolonimbus\application
+builder.exe %SignFullPath% F:\Code\Kernel\cumolonimbus\library
 
 date %d%
 pause

@@ -353,7 +353,7 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 		PUCHAR context = (PUCHAR) * (PULONG64)(teb + 0x1488);
 		*(uint32_t*)&x86_buffer[2] = (uint32_t)shell_code_buffer;										//shellcode
 		*(uint32_t*)&x86_buffer[15] = ((uint32_t)user_buffer + 0x500);									//flags
-		*(uint32_t*)&x86_buffer[32] = *(PULONG)(context + 0xbc);										//ret
+		*(uint32_t*)&x86_buffer[32] = *(uint32_t*)(context + 0xbc);										//ret
 		RtlCopyMemory(user_buffer, x86_buffer, sizeof(x86_buffer));										//×¢Èë
 		*(uint32_t*)(context + 0xbc) = reinterpret_cast<uint32_t>(user_buffer);							//ÐÞ¸Äeip
 	}

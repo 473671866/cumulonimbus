@@ -3,15 +3,16 @@
 #include "comm.h"
 #include "call.h"
 #include "window.h"
+#include "global.h"
 #include "utils/utils.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
+#include "InfinityHook/hook.h"
+
 //TODO:
 //模块hook
 //机器码
 //图标
-//窗口保护
-//etw hook
 
 NTSTATUS Controller(CommPackage* package)
 {
@@ -29,7 +30,8 @@ NTSTATUS Controller(CommPackage* package)
 
 	case Command::LoadLibrary_x64: {
 		InjectPackage* data = reinterpret_cast<InjectPackage*>(package->buffer);
-		if (!MmIsAddressValid(reinterpret_cast<void*>(data->filebuffer))) {
+		if (!utils::ProbeUserAddress((void*)data->filebuffer, data->filesize, 1)) {
+			LOG_INFO("LoadLibrary_x64 invalid filebuffer");
 			return STATUS_INVALID_ADDRESS;
 		}
 
@@ -46,7 +48,8 @@ NTSTATUS Controller(CommPackage* package)
 
 	case Command::LoadLibrary_x86: {
 		InjectPackage* data = reinterpret_cast<InjectPackage*>(package->buffer);
-		if (!MmIsAddressValid(reinterpret_cast<void*>(data->filebuffer))) {
+		if (!utils::ProbeUserAddress((void*)data->filebuffer, data->filesize, 1)) {
+			LOG_INFO("LoadLibrary_x86 invalid filebuffer");
 			return STATUS_INVALID_ADDRESS;
 		}
 
@@ -56,7 +59,7 @@ NTSTATUS Controller(CommPackage* package)
 		}
 
 		RtlCopyMemory(filebuffer, reinterpret_cast<void*>(data->filebuffer), data->filesize);
-		auto status = LoadLibrary_x64(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
+		auto status = LoadLibrary_x86(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
 		utils::RtlFreeMemory(filebuffer);
 		return status;
 	}
@@ -69,13 +72,14 @@ NTSTATUS Controller(CommPackage* package)
 
 	case Command::RecovreMemory: {
 		memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
-		return mem->RecovreMemory(package->buffer);
+		HideMemoryPackage* data = reinterpret_cast<HideMemoryPackage*>(package->buffer);
+		return mem->RecovreMemory((HANDLE)data->pid, data->address);
 	}
 
 	case Command::AllocateMemory: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		void* address = nullptr;
-		auto status = ProcessUtils::PsAllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->proteced);
+		auto status = ProcessUtils::PsAllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->protect);
 		data->address = reinterpret_cast<uint64_t>(address);
 		return status;
 	}
@@ -121,6 +125,25 @@ NTSTATUS Controller(CommPackage* package)
 		return AntiScreenShot((HWND)package->buffer) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 	}
 
+	case Command::InitializeWindowProtected: {
+		if (hook::Initialize(WindowProtected)) {
+			if (hook::Launcher()) {
+				return STATUS_SUCCESS;
+			}
+		}
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	case Command::InstallWindowProtected: {
+		auto collection = GetGlobalVector();
+		collection->push_back(package->buffer);
+		return STATUS_SUCCESS;
+	}
+
+	case Command::UnloadWindowProtected: {
+		return hook::Terminator() ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+	}
+
 	default:
 		break;
 	}
@@ -147,6 +170,12 @@ EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 	if (driver_object != nullptr) {
 		driver_object->DriverUnload = DriverUnload;
 	}
+
+	//GetZwUserGetForegroundWindowAddress();
+	//GetZwUserWindowFromPointAddress();
+	//GetNtUserBuildHwndListAddress();
+	//GetNtUserQueryWindowAddress();
+	//GetNtUserFindWindowExAddress();
 
 	return Register(Controller);
 }

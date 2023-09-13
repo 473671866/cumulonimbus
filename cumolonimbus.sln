@@ -6,16 +6,12 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "driver", "driver\driver.vcxproj", "{579B8CB9-B45E-4E9C-98AB-1A0E9C9BFC63}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "application", "application\application.vcxproj", "{F147FB0B-0D3A-448D-ABCF-B17847FBBD21}"
-	ProjectSection(ProjectDependencies) = postProject
-		{BE88314F-16EA-49CC-AE6F-47560EBCA68B} = {BE88314F-16EA-49CC-AE6F-47560EBCA68B}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "builder", "builder\builder.vcxproj", "{12EB730D-1606-4E0F-9241-AD96627E393E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "load", "load\load.vcxproj", "{BE88314F-16EA-49CC-AE6F-47560EBCA68B}"
-	ProjectSection(ProjectDependencies) = postProject
-		{579B8CB9-B45E-4E9C-98AB-1A0E9C9BFC63} = {579B8CB9-B45E-4E9C-98AB-1A0E9C9BFC63}
-	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "library", "library\library.vcxproj", "{5F1C3787-10C0-459F-9FEE-82A8908E9409}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -101,6 +97,18 @@ Global
 		{BE88314F-16EA-49CC-AE6F-47560EBCA68B}.Release|x86.ActiveCfg = Release|Win32
 		{BE88314F-16EA-49CC-AE6F-47560EBCA68B}.Release|x86.Build.0 = Release|Win32
 		{BE88314F-16EA-49CC-AE6F-47560EBCA68B}.Release|x86.Deploy.0 = Release|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Debug|ARM.ActiveCfg = Debug|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Debug|x64.ActiveCfg = Debug|x64
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Debug|x64.Build.0 = Debug|x64
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Debug|x86.ActiveCfg = Debug|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Debug|x86.Build.0 = Debug|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|ARM.ActiveCfg = Release|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|ARM64.ActiveCfg = Release|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x64.ActiveCfg = Release|x64
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x64.Build.0 = Release|x64
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x86.ActiveCfg = Release|Win32
+		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -239,10 +239,14 @@ public:
 
 		void* allocate_base = nullptr;
 		size_t region_size = size;
-		ZwAllocateVirtualMemory(NtCurrentProcess(), &allocate_base, 0, &region_size, MEM_COMMIT, protect);
+		status = ZwAllocateVirtualMemory(NtCurrentProcess(), &allocate_base, 0, &region_size, MEM_COMMIT, protect);
+		if (NT_SUCCESS(status)) {
+			RtlZeroMemory(allocate_base, size);
+		}
+
 		KeUnstackDetachProcess(&apc);
 
-		if (address) {
+		if (NT_SUCCESS(status) && address) {
 			*address = allocate_base;
 		}
 		return status;

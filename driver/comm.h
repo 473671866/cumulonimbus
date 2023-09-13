@@ -1,7 +1,7 @@
 #pragma once
 #include "standard/base.h"
 
-enum class  Command : uint64_t
+enum class  Command : unsigned __int64
 {
 	Link = 555,
 	Call,
@@ -18,55 +18,63 @@ enum class  Command : uint64_t
 	ReadPhysical,
 	WritePhysical,
 	AntiScreenShot,
+	InitializeWindowProtected,
+	InstallWindowProtected,
+	UnloadWindowProtected,
 };
+
+#pragma pack(push)
+#pragma pack(8)
 
 struct CommPackage
 {
-	uint64_t flags;
+	unsigned __int64 flags;
 	Command command;
-	uint64_t buffer;
-	uint64_t length;
-	int64_t result;
+	unsigned __int64 buffer;
+	unsigned __int64 length;
+	__int64 result;
 };
 
 struct RemoteCallPackage
 {
-	uint64_t pid;
-	uint64_t shellcode;
-	uint64_t size;
+	unsigned __int64 pid;
+	unsigned __int64 shellcode;
+	unsigned __int64 size;
 };
 
 struct InjectPackage
 {
-	uint64_t pid;
-	uint64_t filebuffer;
-	uint64_t filesize;
-	uint64_t imagesize;
+	unsigned __int64 pid;
+	unsigned __int64 filebuffer;
+	unsigned __int64 filesize;
+	unsigned __int64 imagesize;
 };
 
 struct HideMemoryPackage
 {
-	uint64_t pid;
-	uint64_t address;
-	uint64_t size;
+	unsigned __int64 pid;
+	unsigned __int64 address;
+	unsigned __int64 size;
 };
 
 struct ModulePackage
 {
-	uint64_t pid;
-	uint64_t name;
-	uint64_t address;
-	uint64_t size;
+	unsigned __int64 pid;
+	unsigned __int64 name;
+	unsigned __int64 address;
+	unsigned __int64 size;
 };
 
 struct MemoryPackage
 {
-	uint64_t pid;
-	uint64_t address;
-	uint64_t buffer;
-	uint64_t size;
-	uint64_t proteced;
+	unsigned __int64 pid;
+	unsigned __int64 address;
+	unsigned __int64 buffer;
+	unsigned __int64 size;
+	unsigned __int64 protect;
 };
+
+#pragma pack(pop)
 
 typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);
 NTSTATUS Register(CommCallbackProc callback);

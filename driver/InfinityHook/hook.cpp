@@ -242,10 +242,10 @@ namespace hook
 					// If the value is different, re-hook it
 					if (self_get_cpu_clock != *m_GetCpuClock_ptr)
 					{
-						if (InfinityHook(m_ssdt_call_back)) Launcher();
+						if (Initialize(m_ssdt_call_back)) Launcher();
 					}
 				}
-				else InfinityHook(m_ssdt_call_back); // GetCpuClock is invalid and needs to be reacquired
+				else Initialize(m_ssdt_call_back); // GetCpuClock is invalid and needs to be reacquired
 			}
 		}
 
@@ -253,7 +253,7 @@ namespace hook
 		PsTerminateSystemThread(STATUS_SUCCESS);
 	}
 
-	bool InfinityHook(fssdt_call_back ssdt_call_back)
+	bool Initialize(fssdt_call_back ssdt_call_back)
 	{
 		if (!m_routine_status) return false;
 

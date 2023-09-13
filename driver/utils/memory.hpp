@@ -6,13 +6,14 @@ namespace memory
 {
 	struct HideRecord
 	{
+		HANDLE pid;
+		PEPROCESS process;
 		void* address;
 		size_t size;
 		size_t index;
 		MMPFN* pfnbase;
 		uint64_t pfn[512];
 		uint32_t attribute[512];
-		PEPROCESS process;
 	};
 
 	class PageTableUtils
@@ -168,6 +169,7 @@ namespace memory
 			record.address = virtual_address;
 			record.size = size;
 			record.pfnbase = pfnbase;
+			record.pid = PsGetCurrentProcessId();
 			record.process = PsGetCurrentProcess();
 			uint64_t start = reinterpret_cast<uint64_t>(PAGE_ALIGN(virtual_address));
 			uint64_t end = reinterpret_cast<uint64_t>(PAGE_ALIGN(start + size));
@@ -196,22 +198,15 @@ namespace memory
 			//获取进程
 			PEPROCESS process = nullptr;
 			auto status = PsLookupProcessByProcessId(pid, &process);
+			auto dereference_process = std::experimental::make_scope_exit([process] {ObDereferenceObject(process); });
 			if (!NT_SUCCESS(status)) {
 				LOG_WARN("get PsLookupProcessByProcessId failed status: %llx", status);
 				return status;
 			}
 
-			if (PsGetProcessExitStatus(process) == 0x103) {
-				LOG_WARN("process is termination");
+			if (PsGetProcessExitStatus(process) != 0x103) {
 				ObDereferenceObject(process);
 				return STATUS_PROCESS_IS_TERMINATING;
-			}
-
-			//参数校验
-			void* virtual_address = (void*)temp;
-			if (virtual_address == 0 || !MmIsAddressValid(virtual_address)) {
-				LOG_WARN("invalid address");
-				return STATUS_INVALID_ADDRESS;
 			}
 
 			//获取MmGetVirtualForPhysical
@@ -241,10 +236,18 @@ namespace memory
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
 
+			//参数校验
+			void* virtual_address = (void*)temp;
+			if (virtual_address == 0 || !MmIsAddressValid(virtual_address)) {
+				LOG_WARN("invalid address");
+				return STATUS_INVALID_ADDRESS;
+			}
+
 			HideRecord record{};
 			record.address = virtual_address;
 			record.size = size;
 			record.pfnbase = pfnbase;
+			record.pid = pid;
 			record.process = process;
 			uint64_t start = reinterpret_cast<uint64_t>(PAGE_ALIGN(virtual_address));
 			uint64_t end = reinterpret_cast<uint64_t>(PAGE_ALIGN(start + size));
@@ -266,21 +269,20 @@ namespace memory
 			this->m_record.push_back(record);
 
 			KeUnstackDetachProcess(&apc);
-			ObDereferenceObject(process);
 			return status;
 		}
 
-		template<typename _VA> NTSTATUS RecovreMemory(_VA temp)
+		template<typename _VA> NTSTATUS RecovreMemory(HANDLE pid, _VA temp)
 		{
 			void* virtual_address = (void*)temp;
-			if (virtual_address == 0) {
+			if (pid == 0 || virtual_address == 0) {
 				LOG_WARN("invalid address");
 				return STATUS_INVALID_ADDRESS;
 			}
 
 			for (auto it = this->m_record.begin(); it != this->m_record.end();) {
 				HideRecord record = *it;
-				if (record.address == virtual_address) {
+				if (record.pid == pid && record.address == virtual_address) {
 					KAPC_STATE apc{};
 					KeStackAttachProcess(record.process, &apc);
 					for (int i = 0; i < record.index; i++) {

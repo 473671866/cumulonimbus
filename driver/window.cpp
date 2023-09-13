@@ -1,7 +1,6 @@
 #include "window.h"
 #include "global.h"
 #include "utils/utils.h"
-#include "InfinityHook/hook.h"
 
 typedef BOOL(__fastcall* GreProtectSpriteContentProc)(LPVOID, HWND, INT, UINT);
 
@@ -36,6 +35,7 @@ uint64_t GetZwUserGetForegroundWindowAddress()
 			KeStackAttachProcess(process, &apc);
 			analysis::Pdber* win32 = analysis::Win32k();
 			address = win32->GetPointer("NtUserGetForegroundWindow");
+			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
 		}
 	}
@@ -71,6 +71,7 @@ uint64_t GetZwUserWindowFromPointAddress()
 			KeStackAttachProcess(process, &apc);
 			analysis::Pdber* win32 = analysis::Win32k();
 			address = win32->GetPointer("NtUserWindowFromPoint");
+			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
 		}
 	}
@@ -110,42 +111,34 @@ uint64_t GetNtUserBuildHwndListAddress()
 	return address;
 }
 
+#pragma  warning(push)
+#pragma warning(disable:4702)
+
 NTSTATUS NtUserBuildHwndList(PVOID a1, PVOID a2, PVOID Address, unsigned int a4, ULONG count, PVOID Addressa, PULONG pretCount)
 {
 	typedef NTSTATUS(NTAPI* MyNtUserBuildHwndListProc)(PVOID a1, PVOID a2, PVOID Address, unsigned int a4, ULONG count, PVOID Addressa, PULONG pretCount);
 	MyNtUserBuildHwndListProc 	proc = reinterpret_cast<MyNtUserBuildHwndListProc>(GetNtUserBuildHwndListAddress());
 	NTSTATUS status = proc(a1, a2, Address, a4, count, Addressa, pretCount);
 
-	if (!NT_SUCCESS(status))
-	{
+	if (!NT_SUCCESS(status)) {
 		return status;
 	}
 
-	if (!MmIsAddressValid(pretCount))
-	{
-		return status;
-	}
-
-	if (!MmIsAddressValid(Addressa))
-	{
+	if (!MmIsAddressValid(pretCount) || !MmIsAddressValid(Addressa)) {
 		return status;
 	}
 
 	int scount = *pretCount;//数组大小
 	PVOID* arrays = reinterpret_cast<PVOID*>(Addressa);	//窗口句柄数组
 
-	auto collection = GetGlobalVector();
 	for (int i = 0; i < scount; i++)
 	{
 		PVOID Hwnd = arrays[i];//窗口句柄
-
+		auto collection = GetGlobalVector();
 		auto cmp = [Hwnd](uint64_t WindowsHandle) {return reinterpret_cast<uint64_t>(Hwnd) == WindowsHandle; };
-
-		//没找到
 		if (find_if(collection->begin(), collection->end(), cmp) != collection->end()) {
 			return status;
 		}
-
 		//找到了
 		if (i == 0)
 		{
@@ -166,6 +159,7 @@ NTSTATUS NtUserBuildHwndList(PVOID a1, PVOID a2, PVOID Address, unsigned int a4,
 	}
 	return status;
 }
+#pragma warning(pop)
 
 /*----------------------------------------查询窗口-------------------------------------*/
 uint64_t GetNtUserQueryWindowAddress()
@@ -179,6 +173,7 @@ uint64_t GetNtUserQueryWindowAddress()
 			KeStackAttachProcess(process, &apc);
 			analysis::Pdber* win32 = analysis::Win32k();
 			address = win32->GetPointer("NtUserQueryWindow");
+			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
 		}
 	}
@@ -210,6 +205,7 @@ uint64_t GetNtUserFindWindowExAddress()
 			KeStackAttachProcess(process, &apc);
 			analysis::Pdber* win32 = analysis::Win32k();
 			address = win32->GetPointer("NtUserFindWindowEx");
+			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
 		}
 	}
@@ -242,8 +238,8 @@ PVOID NtUserFindWindowEx(
 	return hwnd;
 }
 
-void InfintyHook(
-	_In_ unsigned int SystemCallIndex,
+void WindowProtected(
+	_In_ unsigned long SystemCallIndex,
 	_Inout_ void** SystemCallFunction
 )
 {

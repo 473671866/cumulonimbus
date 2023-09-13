@@ -1,0 +1,23 @@
+LIBRARY
+	EXPORTS
+		RegisterKey
+		Query
+		Examine
+		Launcher
+		RemoteCall
+		LoadLibrary_x64
+		LoadLibrary_x86
+		HideMemory
+		RecoverMemory
+		AllocateMemory
+		FreeMemory
+		HideProcess
+		TermiateProcess
+		GetApplicationModule
+		ReadMappingMemory
+		ReadPhysicalMemory
+		WritePhysicalMemory
+		AntiSrceenShot
+		InitializeWindowProtected
+		InstallWindowProtect
+		UnloadWindowProtected
