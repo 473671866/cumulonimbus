@@ -17,8 +17,7 @@ int RegisterKey(const char* key)
 
 char* Query()
 {
-	//return QTime();
-	return nullptr;
+	return QTime();
 }
 
 bool Examine()
@@ -41,8 +40,7 @@ int Launcher()
 		if (!Reg(buffer)) {
 			MessageBoxA(NULL, Tips(), "Tips", MB_OK);
 			int a = 0;
-			int b = a / 0;
-			return 1;
+			return a / 0;
 		}
 	}
 
