@@ -78,7 +78,7 @@ int main()
 
 	system("pause");
 	//¶Á
-	unsigned __int64 address = 0x7ff67a067000;
+	unsigned __int64 address = 0x7ff670287000;
 	unsigned __int64 mapping = 0;
 	ReadMappingMemoryProc ReadMappingMemory = (ReadMappingMemoryProc)GetProcAddress(hmodule, "ReadMappingMemory");
 	success = ReadMappingMemory(pid, address, &mapping, 8);
@@ -128,7 +128,7 @@ int main()
 		0xC3
 	};
 
-	*(unsigned __int64*)&x64buffer[12] = 0x7ff679fa1000;
+	*(unsigned __int64*)&x64buffer[12] = 0x7ff6701c1000;
 	RemoteCallProc RemoteCall = (RemoteCallProc)GetProcAddress(hmodule, "RemoteCall");
 	success = RemoteCall(pid, x64buffer, sizeof(x64buffer));
 	if (success) {

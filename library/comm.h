@@ -77,4 +77,4 @@ struct MemoryPackage
 
 #pragma pack(pop)
 
-EXTERN_C bool SengMessageEx(Command command, void* buffer, unsigned __int64 length);
+EXTERN_C __declspec(noinline) bool SendMessageEx(Command command, void* buffer, unsigned __int64 length);

@@ -24,6 +24,7 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::Call: {
+		DbgBreakPoint();
 		RemoteCallPackage* data = reinterpret_cast<RemoteCallPackage*>(package->buffer);
 		return RemoteCall((HANDLE)data->pid, (void*)data->shellcode, data->size);
 	}
@@ -153,7 +154,7 @@ NTSTATUS Controller(CommPackage* package)
 void DriverUnload(PDRIVER_OBJECT)
 {
 	LogTermination();
-	UnRegister();
+	comm::UnRegister();
 	return;
 }
 
@@ -177,5 +178,5 @@ EXTERN_C NTSTATUS DriverEntry(PDRIVER_OBJECT driver_object, PUNICODE_STRING)
 	//GetNtUserQueryWindowAddress();
 	//GetNtUserFindWindowExAddress();
 
-	return Register(Controller);
+	return comm::Register(Controller);
 }

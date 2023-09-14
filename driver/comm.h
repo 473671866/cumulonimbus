@@ -76,6 +76,13 @@ struct MemoryPackage
 
 #pragma pack(pop)
 
-typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);
-NTSTATUS Register(CommCallbackProc callback);
-boolean UnRegister();
+//typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);
+//NTSTATUS Register(CommCallbackProc callback);
+//boolean UnRegister();
+
+namespace comm
+{
+	typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);
+	NTSTATUS Register(CommCallbackProc callback);
+	VOID UnRegister();
+}

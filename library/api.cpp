@@ -17,18 +17,23 @@ int RegisterKey(const char* key)
 
 char* Query()
 {
+#ifdef NDEBUG
 	return QTime();
+#else
+	return nullptr;
+#endif
 }
 
 bool Examine()
 {
 	unsigned __int64 code = 0;
-	SengMessageEx(Command::Link, &code, sizeof(code));
+	SendMessageEx(Command::Link, &code, sizeof(code));
 	return code == 0x77777 ? 0 : 1;
 }
 
 int Launcher()
 {
+#ifdef NDEBUG
 	if (!Initialization(29834, 1, "xt0w4pimxxufygztaw", "1+3+4+", 0)) {
 		return 1;
 	}
@@ -43,6 +48,7 @@ int Launcher()
 			return a / 0;
 		}
 	}
+#endif
 
 	if (Examine() == 0) {
 		return 0;
@@ -83,7 +89,7 @@ unload:
 bool RemoteCall(unsigned __int64 pid, void* shellcode, unsigned __int64 size)
 {
 	RemoteCallPackage package{ .pid = pid, .shellcode = reinterpret_cast<unsigned __int64>(shellcode), .size = size };
-	return SengMessageEx(Command::Call, &package, sizeof(package));
+	return SendMessageEx(Command::Call, &package, sizeof(package));
 }
 
 bool LoadLibrary_x64(unsigned __int64 pid, const char* filepath)
@@ -118,7 +124,7 @@ bool LoadLibrary_x64(unsigned __int64 pid, const char* filepath)
 	}
 
 	InjectPackage package{ .pid = pid, .filebuffer = reinterpret_cast<unsigned __int64>(filebuffer), .filesize = filesize, .imagesize = nt_headers->OptionalHeader.SizeOfImage };
-	return SengMessageEx(Command::LoadLibrary_x64, &package, sizeof(package));
+	return SendMessageEx(Command::LoadLibrary_x64, &package, sizeof(package));
 }
 
 bool LoadLibrary_x86(unsigned __int64 pid, const char* filepath)
@@ -153,48 +159,48 @@ bool LoadLibrary_x86(unsigned __int64 pid, const char* filepath)
 	}
 
 	InjectPackage package{ .pid = pid, .filebuffer = reinterpret_cast<unsigned __int64>(filebuffer), .filesize = filesize, .imagesize = nt_headers->OptionalHeader.SizeOfImage };
-	return SengMessageEx(Command::LoadLibrary_x86, &package, sizeof(package));
+	return SendMessageEx(Command::LoadLibrary_x86, &package, sizeof(package));
 }
 
 bool HideMemory(unsigned __int64 pid, void* address, unsigned __int64 size)
 {
 	HideMemoryPackage package{ .pid = pid, .address = reinterpret_cast<unsigned __int64>(address), .size = size };
-	return SengMessageEx(Command::HideMemory, &package, sizeof(package));
+	return SendMessageEx(Command::HideMemory, &package, sizeof(package));
 }
 
 bool RecoverMemory(unsigned __int64 pid, void* address, unsigned __int64 size)
 {
 	HideMemoryPackage package{ .pid = pid, .address = reinterpret_cast<unsigned __int64>(address), .size = size };
-	return SengMessageEx(Command::RecovreMemory, &package, sizeof(address));
+	return SendMessageEx(Command::RecovreMemory, &package, sizeof(address));
 }
 
 void* AllocateMemory(unsigned __int64 pid, unsigned long size, unsigned __int64 protect)
 {
 	MemoryPackage package{ .pid = pid, .address = 0, .size = size, .protect = protect };
-	SengMessageEx(Command::AllocateMemory, &package, sizeof(package));
+	SendMessageEx(Command::AllocateMemory, &package, sizeof(package));
 	return reinterpret_cast<void*>(package.address);
 }
 
 bool FreeMemory(unsigned __int64 pid, void* address, unsigned __int64 size)
 {
 	MemoryPackage package{ .pid = pid, .address = (unsigned __int64)address, .size = size, .protect = 0 };
-	return	SengMessageEx(Command::FreeMemory, &package, sizeof(package));
+	return	SendMessageEx(Command::FreeMemory, &package, sizeof(package));
 }
 
 bool HideProcess(unsigned __int64 pid)
 {
-	return SengMessageEx(Command::HideProcess, reinterpret_cast<void*>(pid), sizeof(pid));
+	return SendMessageEx(Command::HideProcess, reinterpret_cast<void*>(pid), sizeof(pid));
 }
 
 bool TermiateProcess(unsigned __int64 pid)
 {
-	return SengMessageEx(Command::TerminateProcess, (void*)pid, sizeof(pid));
+	return SendMessageEx(Command::TerminateProcess, (void*)pid, sizeof(pid));
 }
 
 bool GetApplicationModule(unsigned __int64 pid, const char* module_name, void* address, unsigned __int64* size)
 {
 	ModulePackage package{ .pid = pid, .name = reinterpret_cast<unsigned __int64>(module_name),.address = 0, .size = 0 };
-	bool success = SengMessageEx(Command::Module, &package, sizeof(package));
+	bool success = SendMessageEx(Command::Module, &package, sizeof(package));
 	if (address) {
 		*(unsigned __int64*)address = package.address;
 	}
@@ -207,37 +213,37 @@ bool GetApplicationModule(unsigned __int64 pid, const char* module_name, void* a
 bool ReadMappingMemory(unsigned __int64 pid, void* address, void* buffer, unsigned __int64 size)
 {
 	MemoryPackage package{ .pid = pid, .address = reinterpret_cast<unsigned __int64>(address), .buffer = reinterpret_cast<unsigned __int64>(buffer), .size = size };
-	return SengMessageEx(Command::ReadMapping, &package, sizeof(package));
+	return SendMessageEx(Command::ReadMapping, &package, sizeof(package));
 }
 
 bool ReadPhysicalMemory(unsigned __int64 pid, void* address, void* buffer, unsigned __int64 size)
 {
 	MemoryPackage package{ .pid = pid, .address = reinterpret_cast<unsigned __int64>(address), .buffer = reinterpret_cast<unsigned __int64>(buffer), .size = size };
-	return SengMessageEx(Command::ReadPhysical, &package, sizeof(package));
+	return SendMessageEx(Command::ReadPhysical, &package, sizeof(package));
 }
 
 bool WritePhysicalMemory(unsigned __int64 pid, void* address, void* buffer, unsigned __int64 size)
 {
 	MemoryPackage package{ .pid = pid, .address = reinterpret_cast<unsigned __int64>(address), .buffer = reinterpret_cast<unsigned __int64>(buffer), .size = size };
-	return SengMessageEx(Command::WritePhysical, &package, sizeof(package));
+	return SendMessageEx(Command::WritePhysical, &package, sizeof(package));
 }
 
 bool AntiSrceenShot(HWND hwnd)
 {
-	return SengMessageEx(Command::AntiScreenShot, hwnd, sizeof(HWND));
+	return SendMessageEx(Command::AntiScreenShot, hwnd, sizeof(HWND));
 }
 
 bool InitializeWindowProtected()
 {
-	return SengMessageEx(Command::InitializeWindowProtected, nullptr, sizeof(HWND));
+	return SendMessageEx(Command::InitializeWindowProtected, nullptr, sizeof(HWND));
 }
 
 bool InstallWindowProtect(HWND hwnd)
 {
-	return SengMessageEx(Command::InstallWindowProtected, hwnd, sizeof(HWND));
+	return SendMessageEx(Command::InstallWindowProtected, hwnd, sizeof(HWND));
 }
 
 bool UnloadWindowProtected()
 {
-	return SengMessageEx(Command::UnloadWindowProtected, nullptr, sizeof(HWND));
+	return SendMessageEx(Command::UnloadWindowProtected, nullptr, sizeof(HWND));
 }

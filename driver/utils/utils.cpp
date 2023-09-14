@@ -428,10 +428,10 @@ namespace utils
 
 		typedef struct _PEB
 		{
-			ULONG64 x;
+			ULONG64 InheritedAddressSpace;
 			VOID* Mutant;                                                           //0x8
 			VOID* ImageBaseAddress;                                                 //0x10
-			PEB_LDR_DATA* Ldr;														 //0x18
+			PEB_LDR_DATA* Ldr;														//0x18
 		}PEB, * PPEB;
 
 		PVOID GetApplicationModule(HANDLE process_id, PCHAR module_name, PSIZE_T image_size)
