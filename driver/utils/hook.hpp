@@ -7,7 +7,7 @@
 
 namespace hook
 {
-	struct HookRecord
+	struct InlineHookRecord
 	{
 		char* srcbyte[28];					//保存原有字节
 		uint64_t bytesize;					//保存字节的长度
@@ -18,7 +18,7 @@ namespace hook
 		uint64_t success;					//是否HOOK成功
 	};
 
-	struct PteHookRecord
+	struct PageTableHookRecord
 	{
 		void* pdpt;
 		void* pd;
@@ -56,7 +56,7 @@ namespace hook
 		InlineHook()
 		{
 			ExInitializeResourceLite(&this->m_mutex);
-			ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(HookRecord), HOOK_FLAG, NULL);
+			ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(InlineHookRecord), HOOK_FLAG, NULL);
 		}
 
 		~InlineHook()
@@ -65,7 +65,7 @@ namespace hook
 			ExAcquireResourceExclusiveLite(&this->m_mutex, true);
 
 			for (auto it = this->m_record_list.begin(); it != this->m_record_list.end(); it++) {
-				HookRecord* record = *it;
+				InlineHookRecord* record = *it;
 				if (record->success) {
 					void* p = MmMapIoSpace(MmGetPhysicalAddress((void*)record->address), 0x40, MmNonCached);
 					if (p != nullptr) {
@@ -100,7 +100,7 @@ namespace hook
 				return false;
 			}
 
-			HookRecord* record = static_cast<HookRecord*>(ExAllocateFromNPagedLookasideList(&this->m_lookaside));
+			InlineHookRecord* record = static_cast<InlineHookRecord*>(ExAllocateFromNPagedLookasideList(&this->m_lookaside));
 			if (record == nullptr) {
 				LOG_WARN("Inline Hook: builder record failed\n");
 				return false;
@@ -167,7 +167,7 @@ namespace hook
 				return false;
 			}
 
-			HookRecord* record = this->LookupRecord(address);
+			InlineHookRecord* record = this->LookupRecord(address);
 			if (record == nullptr || record->success == false) {
 				LOG_WARN("invalid address or hook");
 				return false;
@@ -196,10 +196,10 @@ namespace hook
 			return true;
 		}
 
-		HookRecord* LookupRecord(uint64_t address)
+		InlineHookRecord* LookupRecord(uint64_t address)
 		{
 			auto it = find_if(this->m_record_list.begin(), this->m_record_list.end(),
-				[&address](HookRecord* record) {
+				[&address](InlineHookRecord* record) {
 					return (record->address == address || record->handler == address);
 				});
 
@@ -210,7 +210,7 @@ namespace hook
 		}
 
 	private:
-		std::list<HookRecord*>	m_record_list;
+		std::list<InlineHookRecord*>	m_record_list;
 		ERESOURCE				m_mutex;
 		NPAGED_LOOKASIDE_LIST	m_lookaside;
 	};
@@ -220,12 +220,14 @@ namespace hook
 	public:
 		PageTableHook()
 		{
-			KeInitializeSpinLock(&this->m_spin_lock);
-			ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(PteHookRecord), HOOK_FLAG, NULL);
+			ExInitializeResourceLite(&this->m_mutex);
+			//KeInitializeSpinLock(&this->m_spin_lock);
+			ExInitializeNPagedLookasideList(&this->m_lookaside, NULL, NULL, NULL, sizeof(PageTableHookRecord), HOOK_FLAG, NULL);
 		}
 
 		~PageTableHook()
 		{
+			ExDeleteResourceLite(&this->m_mutex);
 			ExDeleteNPagedLookasideList(&this->m_lookaside);
 		}
 
@@ -237,14 +239,14 @@ namespace hook
 				return false;
 			}
 
-			PteHookRecord* record = reinterpret_cast<PteHookRecord*>(ExAllocateFromNPagedLookasideList(&this->m_lookaside));
+			PageTableHookRecord* record = reinterpret_cast<PageTableHookRecord*>(ExAllocateFromNPagedLookasideList(&this->m_lookaside));
 			if (record == nullptr) {
 				LOG_WARN("builder PteHookRecord failed");
 				return false;
 			}
 
 			//获取页表
-			PageTableUtils page_table;
+			memory::PageTableUtils page_table;
 
 			pt_entry_64* new_pdpt = page_table.CreatePageTable();
 			if (new_pdpt == nullptr) {
@@ -348,8 +350,10 @@ namespace hook
 			uint64_t new_pt_pfn = page_table.GetPageNumber(new_pt);
 			uint64_t new_page_pfn = page_table.GetPageNumber(hook_page);
 
-			KIRQL irql{};
-			KeAcquireSpinLock(&this->m_spin_lock, &irql);
+			//KIRQL irql{};
+			//KeAcquireSpinLock(&this->m_spin_lock, &irql);
+			KeEnterCriticalRegion();
+			ExAcquireResourceExclusiveLite(&this->m_mutex, true);
 
 			VirtualAddressHelper helper{ .flags = address };
 
@@ -366,7 +370,9 @@ namespace hook
 
 			__invlpg(pml4e);
 
-			KeReleaseSpinLock(&this->m_spin_lock, irql);
+			//KeReleaseSpinLock(&this->m_spin_lock, irql);
+			KeLeaveCriticalRegion();
+			ExReleaseResourceLite(&this->m_mutex);
 
 			*(void**)original = trampline;
 			LOG_INFO("hook success address: %llx", address);
@@ -398,14 +404,14 @@ namespace hook
 				return false;
 			}
 
-			PteHookRecord* record = reinterpret_cast<PteHookRecord*>(ExAllocateFromNPagedLookasideList(&this->m_lookaside));
+			PageTableHookRecord* record = reinterpret_cast<PageTableHookRecord*>(ExAllocateFromNPagedLookasideList(&this->m_lookaside));
 			if (record == nullptr) {
 				LOG_WARN("builder PteHookRecord failed");
 				return false;
 			}
 
 			//获取页表
-			PageTableUtils page_table;
+			memory::PageTableUtils page_table;
 
 			pt_entry_64* new_pdpt = page_table.CreatePageTable();
 			if (new_pdpt == nullptr) {
@@ -509,8 +515,10 @@ namespace hook
 			uint64_t new_pt_pfn = page_table.GetPageNumber(new_pt);
 			uint64_t new_page_pfn = page_table.GetPageNumber(hook_page);
 
-			KIRQL irql{};
-			KeAcquireSpinLock(&this->m_spin_lock, &irql);
+			//KIRQL irql{};
+			//KeAcquireSpinLock(&this->m_spin_lock, &irql);
+			KeEnterCriticalRegion();
+			ExAcquireResourceExclusiveLite(&this->m_mutex, true);
 
 			VirtualAddressHelper helper{ .flags = address };
 
@@ -527,7 +535,10 @@ namespace hook
 
 			__invlpg(pml4e);
 
-			KeReleaseSpinLock(&this->m_spin_lock, irql);
+			//KeReleaseSpinLock(&this->m_spin_lock, irql) ;
+
+			KeLeaveCriticalRegion();
+			ExReleaseResourceLite(&this->m_mutex);
 
 			*(void**)original = trampline;
 			LOG_INFO("hook success address: %llx", address);
@@ -537,7 +548,7 @@ namespace hook
 		template<typename _Fn> boolean Delete(_Fn function)
 		{
 			uint64_t address = (uint64_t)function;
-			PteHookRecord* record = LookupRecord(address);
+			PageTableHookRecord* record = LookupRecord(address);
 			if (record == nullptr) {
 				return false;
 			}
@@ -545,17 +556,19 @@ namespace hook
 			KAPC_STATE apc{};
 			KeStackAttachProcess(record->process, &apc);
 
-			PageTableUtils page_table;
+			memory::PageTableUtils page_table;
 			pml4e_64* pml4e = page_table.GetPml4eAddress(record->address);
 			uint64_t pfn = record->pml4e_page_number;
 
-			KIRQL irql{};
-			KeAcquireSpinLock(&this->m_spin_lock, &irql);
+			//KIRQL irql{};
+			//KeAcquireSpinLock(&this->m_spin_lock, &irql);
 
 			pml4e->page_frame_number = pfn;
 			__invlpg(pml4e);
 
-			KeReleaseSpinLock(&this->m_spin_lock, irql);
+			//KeReleaseSpinLock(&this->m_spin_lock, irql);
+			KeLeaveCriticalRegion();
+			ExReleaseResourceLite(&this->m_mutex);
 			KeUnstackDetachProcess(&apc);
 
 			page_table.FreePageTable(record->pdpt);
@@ -572,9 +585,9 @@ namespace hook
 			return true;
 		}
 
-		PteHookRecord* LookupRecord(uint64_t address)
+		PageTableHookRecord* LookupRecord(uint64_t address)
 		{
-			auto it = find_if(this->m_record_list.begin(), this->m_record_list.end(), [&address](PteHookRecord* record) {return record->address == address; });
+			auto it = find_if(this->m_record_list.begin(), this->m_record_list.end(), [&address](PageTableHookRecord* record) {return record->address == address; });
 			if (it != this->m_record_list.end()) {
 				return *it;
 			}
@@ -582,8 +595,73 @@ namespace hook
 		}
 
 	private:
-		KSPIN_LOCK m_spin_lock;
-		std::list<PteHookRecord*>	m_record_list;
+		ERESOURCE				m_mutex;
+		//KSPIN_LOCK m_spin_lock;
+		std::list<PageTableHookRecord*>	m_record_list;
 		NPAGED_LOOKASIDE_LIST	m_lookaside;
 	};
+
+	//struct ShadowHookRecord
+	//{
+	//	unsigned __int64 pid;
+	//	unsigned __int64 address;
+	//	unsigned __int64 handler;
+	//	unsigned __int64 original_imagebase;
+	//	unsigned __int64 copy_imagebase;
+	//	unsigned __int64 imagesize;
+	//};
+
+	//class ShadowHook
+	//{
+	//public:
+
+	//	bool Install(HANDLE pid, void* address, void* handler, void** original)
+	//	{
+	//		PEPROCESS process = nullptr;
+	//		auto status = PsLookupProcessByProcessId(pid, &process);
+	//		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
+	//		if (!NT_SUCCESS(status)) {
+	//			LOG_WARN("process non existent");
+	//			return false;
+	//		}
+
+	//		if (PsGetProcessExitStatus(process) != 0x103) {
+	//			LOG_WARN("process is termination");
+	//			return false;
+	//		}
+
+	//		KAPC_STATE apc{};
+	//		KeStackAttachProcess(process, &apc);
+
+	//		void* imagebase = 0;
+	//		auto result = RtlPcToFileHeader(address, &imagebase);
+	//		if (result) {
+	//			auto nt_headers = RtlImageNtHeader(imagebase);
+	//			void* base = nullptr;
+	//			size_t region_szie = nt_headers->OptionalHeader.SizeOfImage;
+	//			status = ZwAllocateVirtualMemory(NtCurrentProcess(), &base, 0, &region_szie, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	//			if (NT_SUCCESS(status)) {
+	//				RtlZeroMemory(base, region_szie);
+	//				RtlCopyMemory(base, imagebase, nt_headers->OptionalHeader.SizeOfImage);
+	//				unsigned long old = 0;
+	//				status = ZwProtectVirtualMemory(NtCurrentProcess(), &imagebase, nt_headers->OptionalHeader.SizeOfImage, PAGE_NOACCESS, &old);
+	//				if (NT_SUCCESS(status)) {
+	//					ShadowHookRecord record{};
+	//					record.pid = pid;
+	//					record.address = address;
+	//					record.handler = handler;
+	//					record.original_imagebase = imagebase;
+	//					record.copy_imagebase = base;
+	//					record.imagesize = nt_headers->OptionalHeader.SizeOfImage;
+	//				}
+	//			}
+	//		}
+
+	//		KeUnstackDetachProcess(&apc);
+	//	}
+
+	//	long ExceptionHandler(EXCEPTION_RECORD exception_record, CONTEXT ctx)
+	//	{
+	//	}
+	//};
 }

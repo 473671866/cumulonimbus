@@ -1,7 +1,6 @@
 #pragma once
 #include "../Standard/base.h"
 #include "../pdb/analysis.h"
-#include"../vmp/VMProtectDDK.h"
 #include "utils.h"
 
 struct ServiceDescriptorTable
@@ -18,9 +17,9 @@ public:
 
 	ServiceTableUtils()
 	{
-		analysis::Pdber ntos(L"ntoskrnl.exe"); ntos.init();
-		this->m_service_table = reinterpret_cast<ServiceDescriptorTable*>(ntos.GetPointer("KeServiceDescriptorTable"));
-		this->m_service_table_shadow = reinterpret_cast<ServiceDescriptorTable*>(ntos.GetPointer("KeServiceDescriptorTableShadow"));
+		auto ntos = analysis::Ntoskrnl();
+		this->m_service_table = reinterpret_cast<ServiceDescriptorTable*>(ntos->GetPointer("KeServiceDescriptorTable"));
+		this->m_service_table_shadow = reinterpret_cast<ServiceDescriptorTable*>(ntos->GetPointer("KeServiceDescriptorTableShadow"));
 	}
 
 	/**
@@ -30,7 +29,6 @@ public:
 	*/
 	uint64_t GetServiceTableRoutine(uint32_t service_number)
 	{
-		VMPBegin("GetServiceTableRoutine");
 		LONG offset = this->m_service_table->ServiceTable[service_number];
 		offset >>= 4;
 
@@ -38,7 +36,6 @@ public:
 		result.QuadPart = (ULONG64)this->m_service_table->ServiceTable;
 		result.LowPart += offset;
 
-		VMPEnd();
 		return result.QuadPart;
 	}
 
@@ -49,8 +46,6 @@ public:
 	*/
 	uint64_t GetServiceTableShadowRoutine(uint32_t service_number)
 	{
-		VMPBegin("GetServiceTableShadowRoutine");
-
 		if (service_number >= 0x1000) {
 			service_number -= 0x1000;
 		}
@@ -70,7 +65,6 @@ public:
 			KeUnstackDetachProcess(&apc);
 			ObDereferenceObject(process);
 		}
-		VMPEnd();
 		return result.QuadPart;
 	}
 

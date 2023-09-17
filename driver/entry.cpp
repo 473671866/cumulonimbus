@@ -7,6 +7,7 @@
 #include "utils/utils.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
+#include "utils/version.hpp"
 #include "InfinityHook/hook.h"
 
 //TODO:
@@ -24,7 +25,6 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::Call: {
-		DbgBreakPoint();
 		RemoteCallPackage* data = reinterpret_cast<RemoteCallPackage*>(package->buffer);
 		return RemoteCall((HANDLE)data->pid, (void*)data->shellcode, data->size);
 	}
@@ -66,28 +66,40 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::HideMemory: {
-		HideMemoryPackage* data = reinterpret_cast<HideMemoryPackage*>(package->buffer);
-		memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
-		return mem->HideMemory(reinterpret_cast<HANDLE>(data->pid), data->address, data->size);
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			return STATUS_UNSUCCESSFUL;
+		}
+		else {
+			HideMemoryPackage* data = reinterpret_cast<HideMemoryPackage*>(package->buffer);
+			memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
+			return mem->HideMemory(reinterpret_cast<HANDLE>(data->pid), data->address, data->size);
+		}
 	}
 
 	case Command::RecovreMemory: {
-		memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
-		HideMemoryPackage* data = reinterpret_cast<HideMemoryPackage*>(package->buffer);
-		return mem->RecovreMemory((HANDLE)data->pid, data->address);
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			return STATUS_UNSUCCESSFUL;
+		}
+		else {
+			memory::MemoryUtils* mem = memory::MemoryUtils::get_instance();
+			HideMemoryPackage* data = reinterpret_cast<HideMemoryPackage*>(package->buffer);
+			return mem->RecovreMemory((HANDLE)data->pid, data->address);
+		}
 	}
 
 	case Command::AllocateMemory: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		void* address = nullptr;
-		auto status = ProcessUtils::PsAllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->protect);
+		auto status = ProcessUtils::AllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->protect);
 		data->address = reinterpret_cast<uint64_t>(address);
 		return status;
 	}
 
 	case Command::FreeMemory: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
-		return ProcessUtils::PsFreeMemory((HANDLE)data->pid, (void*)data->address, data->size);
+		return ProcessUtils::FreeMemory((HANDLE)data->pid, (void*)data->address, data->size);
 	}
 
 	case Command::HideProcess: {
@@ -104,7 +116,7 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::TerminateProcess: {
-		return ProcessUtils::PsTerminateProcess((HANDLE)package->buffer);
+		return ProcessUtils::TerminateProcess((HANDLE)package->buffer);
 	}
 
 	case Command::ReadMapping: {

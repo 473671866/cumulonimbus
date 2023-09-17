@@ -2,12 +2,13 @@
 #include <windows.h>
 #include "api.h"
 #include "comm.h"
-#include "load.hpp"
+#include "clouds.h"
 #include "loader.h"
 #include "profile.h"
-#include "driver.hpp"
 #include "spoce_exit.hpp"
-#include "clouds.h"
+
+#include "load.hpp"
+#include "driver.hpp"
 
 int RegisterKey(const char* key)
 {
@@ -58,8 +59,8 @@ int Launcher()
 	char temppath[MAX_PATH]{};
 	GetTempPathA(MAX_PATH, temppath);
 	std::string filename = loader::RandomString(10);
-	std::string service_name = loader::RandomString(10);
 	std::filesystem::path driverpath(std::string(temppath).append(filename).append(".sys"));
+	std::string service_name = loader::RandomString(10);
 	bool success = loader::GenerateDriver(driverpath, load, sizeof(load));
 	if (!success) {
 		result = GetLastError();

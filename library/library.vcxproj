@@ -177,8 +177,10 @@
     <ClInclude Include="load.hpp" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="pdb.h" />
     <ClInclude Include="profile.h" />
     <ClInclude Include="spoce_exit.hpp" />
+    <ClInclude Include="symsrv.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="api.cpp" />
@@ -191,6 +193,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="pdb.cpp" />
     <ClCompile Include="profile.cpp" />
   </ItemGroup>
   <ItemGroup>

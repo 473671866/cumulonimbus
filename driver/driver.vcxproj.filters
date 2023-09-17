@@ -79,6 +79,9 @@
     <ClCompile Include="InfinityHook\hook.cpp">
       <Filter>InfinityHook</Filter>
     </ClCompile>
+    <ClCompile Include="utils\search.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="utils\hook.hpp">
@@ -115,9 +118,6 @@
       <Filter>standrad</Filter>
     </ClInclude>
     <ClInclude Include="standard\ia32_defines_only.h">
-      <Filter>standrad</Filter>
-    </ClInclude>
-    <ClInclude Include="standard\import.h">
       <Filter>standrad</Filter>
     </ClInclude>
     <ClInclude Include="standard\kernel_stl.h">
@@ -204,17 +204,50 @@
     <ClInclude Include="global.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="zwapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="psapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ntapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ntdef.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mmapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="keapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="obapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="exapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rtlapi.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\47367\Downloads\InfinityHookPro-main\infinity_hook_pro\infinity_hook_pro\utils.hpp">
+      <Filter>InfinityHook</Filter>
+    </ClInclude>
     <ClInclude Include="InfinityHook\headers.hpp">
       <Filter>InfinityHook</Filter>
     </ClInclude>
     <ClInclude Include="InfinityHook\hook.h">
       <Filter>InfinityHook</Filter>
     </ClInclude>
+    <ClInclude Include="InfinityHook\hook.hpp">
+      <Filter>InfinityHook</Filter>
+    </ClInclude>
     <ClInclude Include="InfinityHook\imports.hpp">
       <Filter>InfinityHook</Filter>
     </ClInclude>
-    <ClInclude Include="InfinityHook\utils.hpp">
-      <Filter>InfinityHook</Filter>
+    <ClInclude Include="utils\search.h">
+      <Filter>utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -45,6 +45,12 @@
     <ClInclude Include="clouds.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="pdb.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="symsrv.hpp">
+      <Filter>资源文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -63,6 +69,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="profile.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="pdb.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

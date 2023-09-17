@@ -1,8 +1,10 @@
 #include "call.h"
 #include "pdb/analysis.h"
 #include "utils/utils.h"
+#include "utils/search.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
+#include "utils/version.hpp"
 #include "utils/MemLoadDll.h"
 
 //0x70 bytes (sizeof)
@@ -101,8 +103,16 @@ PsGetNextProcessThread(
 {
 	static PsGetNextProcessThreadProc proc = nullptr;
 	if (proc == nullptr) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		proc = reinterpret_cast<PsGetNextProcessThreadProc>(ntos->GetPointer("PsGetNextProcessThread"));
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			SearchUtils search;
+			void* address = search.pattern("ntoskrnl.exe", "PAGE", "4889***4889***4889***57415441554156415748***65********4533FF488BF266FF*****4D8BF74C8D*****418BEF4C8D*****33C0418D**F049****0F");
+			proc = reinterpret_cast<PsGetNextProcessThreadProc>(address);
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			proc = reinterpret_cast<PsGetNextProcessThreadProc>(ntos->GetPointer("PsGetNextProcessThread"));
+		}
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(Process, Thread);
@@ -117,8 +127,16 @@ PsSuspendThread(
 	static PsSuspendThreadProc proc = nullptr;
 
 	if (proc == nullptr) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		proc = reinterpret_cast<PsSuspendThreadProc>(ntos->GetPointer("PsSuspendThread"));
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			SearchUtils search;
+			void* address = search.pattern("ntoskrnl.exe", "PAGE", "4889***4889***5356574154415548***4C8BEA488BF133FF897C**65********4C89******6641*******48******0F**488B0148***488D**F0480FB1110F");
+			proc = reinterpret_cast<PsSuspendThreadProc>(address);
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			proc = reinterpret_cast<PsSuspendThreadProc>(ntos->GetPointer("PsSuspendThread"));
+		}
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(Thread, PreviousSuspendCount);
@@ -133,8 +151,16 @@ PsResumeThread(
 	static PsResumeThreadProc proc = nullptr;
 
 	if (proc == nullptr) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		proc = reinterpret_cast<PsResumeThreadProc>(ntos->GetPointer("PsResumeThread"));
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			SearchUtils search;
+			void* address = search.pattern("ntoskrnl.exe", "PAGE", "FFF348***488BDAE8****4885DB74*890333C048***5BC3");
+			proc = reinterpret_cast<PsResumeThreadProc>(address);
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			proc = reinterpret_cast<PsResumeThreadProc>(ntos->GetPointer("PsResumeThread"));
+		}
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(Thread, PreviousSuspendCount);
@@ -157,8 +183,17 @@ NTSTATUS ZwCreateThreadEx(
 	static ZwCreateThreadExProc proc = nullptr;
 
 	if (proc == nullptr) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		proc = reinterpret_cast<ZwCreateThreadExProc>(ntos->GetPointer("ZwCreateThreadEx"));
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			UNICODE_STRING name{};
+			RtlInitUnicodeString(&name, L"ZwCreateSymbolicLinkObject");
+			void* address = MmGetSystemRoutineAddress(&name);
+			proc = reinterpret_cast<ZwCreateThreadExProc>((unsigned __int64)address + 0x20);
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			proc = reinterpret_cast<ZwCreateThreadExProc>(ntos->GetPointer("ZwCreateThreadEx"));
+		}
 		LOG_INFO("proc: %llx", proc);
 	}
 	return proc(ThreadHandle, DesiredAccess, ObjectAttributes, ProcessHandle, StartRoutine, StartContext, CreateThreadFlags, ZeroBits, StackSize, MaximumStackSize, AttributeList);
@@ -168,8 +203,14 @@ uint64_t GetTrapFrameOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		offset = ntos->GetOffset("_KTHREAD", "TrapFrame");
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			offset = 0x1d8;
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			offset = ntos->GetOffset("_KTHREAD", "TrapFrame");
+		}
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -179,8 +220,14 @@ uint64_t GetThreadIdOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		offset = ntos->GetOffset("_ETHREAD", "Cid");
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			offset = 0x3b0;
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			offset = ntos->GetOffset("_ETHREAD", "Cid");
+		}
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -190,8 +237,14 @@ uint64_t GetStartAddressOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		offset = ntos->GetOffset("_ETHREAD", "StartAddress");
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			offset = 0x388;
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			offset = ntos->GetOffset("_ETHREAD", "StartAddress");
+		}
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -201,8 +254,14 @@ uint64_t GetWin32StartAddressOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		offset = ntos->GetOffset("_ETHREAD", "Win32StartAddress");
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			offset = 0x410;
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			offset = ntos->GetOffset("_ETHREAD", "Win32StartAddress");
+		}
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -212,8 +271,14 @@ uint64_t GetThreadListOffset()
 {
 	static uint64_t offset = 0;
 	if (offset == 0) {
-		analysis::Pdber* ntos = analysis::Ntoskrnl();
-		offset = ntos->GetOffset("_ETHREAD", "ThreadListEntry");
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			offset = 0x420;
+		}
+		else {
+			analysis::Pdber* ntos = analysis::Ntoskrnl();
+			offset = ntos->GetOffset("_ETHREAD", "ThreadListEntry");
+		}
 		LOG_INFO("offset: %llx", offset);
 	}
 	return offset;
@@ -285,10 +350,9 @@ NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 		return STATUS_THREAD_NOT_IN_PROCESS;
 	}
 
-	if (PsGetThreadExitStatus(thread) != 0x103)
-	{
-		return STATUS_THREAD_IS_TERMINATING;
-	}
+	//if (PsGetThreadExitStatus(thread) != 0x103) {
+	//	return STATUS_THREAD_IS_TERMINATING;
+	//}
 
 	//挂起线程
 	status = PsSuspendThread(thread, nullptr);
@@ -453,10 +517,9 @@ NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t i
 		return STATUS_THREAD_NOT_IN_PROCESS;
 	}
 
-	if (PsGetThreadExitStatus(thread) != 0x103)
-	{
-		return STATUS_THREAD_IS_TERMINATING;
-	}
+	//if (PsGetThreadExitStatus(thread) != 0x103){
+	//	return STATUS_THREAD_IS_TERMINATING;
+	//}
 
 	//挂起线程
 	status = PsSuspendThread(thread, nullptr);

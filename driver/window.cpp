@@ -1,6 +1,8 @@
 #include "window.h"
 #include "global.h"
 #include "utils/utils.h"
+#include "utils/search.h"
+#include "utils/version.hpp"
 
 typedef BOOL(__fastcall* GreProtectSpriteContentProc)(LPVOID, HWND, INT, UINT);
 
@@ -12,13 +14,23 @@ BOOL AntiScreenShot(HWND hwnd)
 	if (NT_SUCCESS(status)) {
 		KAPC_STATE apc{};
 		KeStackAttachProcess(process, &apc);
-		analysis::Pdber* win32kfull = analysis::Win32kfull();
-		auto address = win32kfull->GetPointer("GreProtectSpriteContent");
+		unsigned __int64 address = 0;
+		auto version = Version::get_instance();
+		if (version->Windows_7()) {
+			SearchUtils search;
+			address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***4889***565741544155415648***4533F6418BD9488BFA4585C00F*****");
+		}
+		else {
+			analysis::Pdber* win32kfull = analysis::Win32kfull();
+			address = win32kfull->GetPointer("GreProtectSpriteContent");
+		}
+
 		if (address) {
 			GreProtectSpriteContentProc proc = (GreProtectSpriteContentProc)address;
 			success = proc(NULL, hwnd, TRUE, 0x00000011);
 		}
 		KeUnstackDetachProcess(&apc);
+		ObDereferenceObject(process);
 	}
 	return success;
 }
@@ -33,10 +45,18 @@ uint64_t GetZwUserGetForegroundWindowAddress()
 		if (NT_SUCCESS(status)) {
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
-			analysis::Pdber* win32 = analysis::Win32k();
-			address = win32->GetPointer("NtUserGetForegroundWindow");
+			auto version = Version::get_instance();
+			if (version->Windows_7()) {
+				SearchUtils search;
+				address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***5748***48******FF15****4C******33DB4C3BDB74*4939**74*498B**FF15****488B**4839*****75*488B1F");
+			}
+			else {
+				analysis::Pdber* win32 = analysis::Win32k();
+				address = win32->GetPointer("NtUserGetForegroundWindow");
+			}
 			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
+			ObDereferenceObject(process);
 		}
 	}
 
@@ -69,10 +89,18 @@ uint64_t GetZwUserWindowFromPointAddress()
 		if (NT_SUCCESS(status)) {
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
-			analysis::Pdber* win32 = analysis::Win32k();
-			address = win32->GetPointer("NtUserWindowFromPoint");
+			auto version = Version::get_instance();
+			if (version->Windows_7()) {
+				SearchUtils search;
+				address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***4889***5748***48******FF15****C6******48******E8****");
+			}
+			else {
+				analysis::Pdber* win32 = analysis::Win32k();
+				address = win32->GetPointer("NtUserWindowFromPoint");
+			}
 			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
+			ObDereferenceObject(process);
 		}
 	}
 
@@ -103,9 +131,17 @@ uint64_t GetNtUserBuildHwndListAddress()
 		if (NT_SUCCESS(status)) {
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
-			analysis::Pdber* win32 = analysis::Win32k();
-			address = win32->GetPointer("NtUserBuildHwndList");
+			auto version = Version::get_instance();
+			if (version->Windows_7()) {
+				SearchUtils search;
+				address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***4889***4889***41544155415648***418BD9458BF0488BFA488BF14533E4458D***48******FF15****");
+			}
+			else {
+				analysis::Pdber* win32 = analysis::Win32k();
+				address = win32->GetPointer("NtUserBuildHwndList");
+			}
 			KeUnstackDetachProcess(&apc);
+			ObDereferenceObject(process);
 		}
 	}
 	return address;
@@ -171,10 +207,18 @@ uint64_t GetNtUserQueryWindowAddress()
 		if (NT_SUCCESS(status)) {
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
-			analysis::Pdber* win32 = analysis::Win32k();
-			address = win32->GetPointer("NtUserQueryWindow");
+			auto version = Version::get_instance();
+			if (version->Windows_7()) {
+				SearchUtils search;
+				address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***5748***488BD948******8BFAFF15****488BCBE8****488BD84885C075*");
+			}
+			else {
+				analysis::Pdber* win32 = analysis::Win32k();
+				address = win32->GetPointer("NtUserQueryWindow");
+			}
 			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
+			ObDereferenceObject(process);
 		}
 	}
 	return address;
@@ -203,10 +247,18 @@ uint64_t GetNtUserFindWindowExAddress()
 		if (NT_SUCCESS(status)) {
 			KAPC_STATE apc{};
 			KeStackAttachProcess(process, &apc);
-			analysis::Pdber* win32 = analysis::Win32k();
-			address = win32->GetPointer("NtUserFindWindowEx");
+			auto version = Version::get_instance();
+			if (version->Windows_7()) {
+				SearchUtils search;
+				address = (unsigned __int64)search.pattern("win32k.sys", ".text", "488BC44889**4889**4889**4C89**415548***4D8BE94D8BE0488BF2488BF948******FF15****");
+			}
+			else {
+				analysis::Pdber* win32 = analysis::Win32k();
+				address = win32->GetPointer("NtUserFindWindowEx");
+			}
 			LOG_DEBUG("%llx", address);
 			KeUnstackDetachProcess(&apc);
+			ObDereferenceObject(process);
 		}
 	}
 	return address;

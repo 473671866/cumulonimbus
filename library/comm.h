@@ -5,6 +5,7 @@
 enum class  Command : unsigned __int64
 {
 	Link = 555,
+	Initialize,
 	Call,
 	LoadLibrary_x64,
 	LoadLibrary_x86,

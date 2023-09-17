@@ -22,16 +22,23 @@ namespace analysis {
 		return &ntos;
 	}
 
+	inline Pdber* Ntdll()
+	{
+		static Pdber ntdll(L"ntdll.dll");
+		static boolean success = ntdll.init();
+		return &ntdll;
+	}
+
 	inline Pdber* Win32kfull()
 	{
-		static analysis::Pdber win32kfull(L"win32kfull.sys");
+		static Pdber win32kfull(L"win32kfull.sys");
 		static boolean success = win32kfull.init();
 		return &win32kfull;
 	}
 
 	inline Pdber* Win32k()
 	{
-		static analysis::Pdber win32k(L"win32k.sys");
+		static Pdber win32k(L"win32k.sys");
 		static boolean success = win32k.init();
 		return &win32k;
 	}

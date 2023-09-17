@@ -69,7 +69,8 @@ extern "C" {
 		SIZE_T log_max_usage;
 
 		HANDLE log_file_handle;
-		KSPIN_LOCK spin_lock;
+		ERESOURCE m_mutex;
+		//KSPIN_LOCK spin_lock;
 		ERESOURCE resource;
 		bool resource_initialized;
 		volatile bool buffer_flush_thread_should_be_alive;
@@ -211,7 +212,8 @@ extern "C" {
 			NT_ASSERT(log_file_path);
 		NT_ASSERT(info);
 
-		KeInitializeSpinLock(&info->spin_lock);
+		ExInitializeResourceLite(&info->m_mutex);
+		//KeInitializeSpinLock(&info->spin_lock);
 
 		auto status = RtlStringCchCopyW(
 			info->log_file_path, RTL_NUMBER_OF_FIELD(LogBufferInfo, log_file_path),
@@ -402,6 +404,7 @@ extern "C" {
 			ExDeleteResourceLite(&info->resource);
 			info->resource_initialized = false;
 		}
+		ExDeleteResourceLite(&info->m_mutex);
 	}
 
 	// Actual implementation of logging API.
@@ -611,15 +614,19 @@ extern "C" {
 
 		// Acquire a spin lock for info.log_buffer(s) in order to switch its head
 		// safely.
-		KLOCK_QUEUE_HANDLE lock_handle = {};
-		KeAcquireInStackQueuedSpinLock(&info->spin_lock, &lock_handle);
+		//KLOCK_QUEUE_HANDLE lock_handle = {};
+		//KeAcquireInStackQueuedSpinLock(&info->spin_lock, &lock_handle);
+		KeEnterCriticalRegion();
+		ExAcquireResourceExclusiveLite(&info->m_mutex, true);
 		const auto old_log_buffer = const_cast<char*>(info->log_buffer_head);
 		info->log_buffer_head = (old_log_buffer == info->log_buffer1)
 			? info->log_buffer2
 			: info->log_buffer1;
 		info->log_buffer_head[0] = '\0';
 		info->log_buffer_tail = info->log_buffer_head;
-		KeReleaseInStackQueuedSpinLock(&lock_handle);
+		//KeReleaseInStackQueuedSpinLock(&lock_handle);
+		KeLeaveCriticalRegion();
+		ExReleaseResourceLite(&info->m_mutex);
 
 		// Write all log entries in old log buffer.
 		IO_STATUS_BLOCK io_status = {};
@@ -679,15 +686,17 @@ extern "C" {
 		NT_ASSERT(info);
 
 		// Acquire a spin lock to add the log safely.
-		KLOCK_QUEUE_HANDLE lock_handle = {};
-		const auto old_irql = KeGetCurrentIrql();
-		if (old_irql < DISPATCH_LEVEL) {
-			KeAcquireInStackQueuedSpinLock(&info->spin_lock, &lock_handle);
-		}
-		else {
-			KeAcquireInStackQueuedSpinLockAtDpcLevel(&info->spin_lock, &lock_handle);
-		}
-		NT_ASSERT(KeGetCurrentIrql() >= DISPATCH_LEVEL);
+		//KLOCK_QUEUE_HANDLE lock_handle = {};
+		//const auto old_irql = KeGetCurrentIrql();
+		//if (old_irql < DISPATCH_LEVEL) {
+		//	KeAcquireInStackQueuedSpinLock(&info->spin_lock, &lock_handle);
+		//}
+		//else {
+		//	KeAcquireInStackQueuedSpinLockAtDpcLevel(&info->spin_lock, &lock_handle);
+		//}
+		//NT_ASSERT(KeGetCurrentIrql() >= DISPATCH_LEVEL);
+		KeEnterCriticalRegion();
+		ExAcquireResourceExclusiveLite(&info->m_mutex, true);
 
 		// Copy the current log to the buffer.
 		SIZE_T used_buffer_size = info->log_buffer_tail - info->log_buffer_head;
@@ -709,12 +718,15 @@ extern "C" {
 		}
 		*info->log_buffer_tail = '\0';
 
-		if (old_irql < DISPATCH_LEVEL) {
-			KeReleaseInStackQueuedSpinLock(&lock_handle);
-		}
-		else {
-			KeReleaseInStackQueuedSpinLockFromDpcLevel(&lock_handle);
-		}
+		KeLeaveCriticalRegion();
+		ExReleaseResourceLite(&info->m_mutex);
+
+		//if (old_irql < DISPATCH_LEVEL) {
+		//	KeReleaseInStackQueuedSpinLock(&lock_handle);
+		//}
+		//else {
+		//	KeReleaseInStackQueuedSpinLockFromDpcLevel(&lock_handle);
+		//}
 		return status;
 	}
 

@@ -4,6 +4,7 @@
 enum class  Command : unsigned __int64
 {
 	Link = 555,
+	Initialize,
 	Call,
 	LoadLibrary_x64,
 	LoadLibrary_x86,
@@ -75,10 +76,6 @@ struct MemoryPackage
 };
 
 #pragma pack(pop)
-
-//typedef NTSTATUS(*CommCallbackProc)(CommPackage* package);
-//NTSTATUS Register(CommCallbackProc callback);
-//boolean UnRegister();
 
 namespace comm
 {

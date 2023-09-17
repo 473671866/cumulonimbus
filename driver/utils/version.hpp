@@ -131,7 +131,7 @@ public:
 
 	boolean Windows_7()
 	{
-		return (this->version == SystemVersion::Windows7);
+		return (this->version == SystemVersion::Windows7 || this->version == SystemVersion::Windows7_SP1);
 	}
 
 	boolean Windows_7_sp1()
