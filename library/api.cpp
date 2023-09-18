@@ -200,7 +200,7 @@ bool TermiateProcess(unsigned __int64 pid)
 
 bool GetApplicationModule(unsigned __int64 pid, const char* module_name, void* address, unsigned __int64* size)
 {
-	ModulePackage package{ .pid = pid, .name = reinterpret_cast<unsigned __int64>(module_name),.address = 0, .size = 0 };
+	ModulePackage package{ .pid = pid, .name = reinterpret_cast<unsigned __int64>(module_name), .address = 0, .size = 0 };
 	bool success = SendMessageEx(Command::Module, &package, sizeof(package));
 	if (address) {
 		*(unsigned __int64*)address = package.address;

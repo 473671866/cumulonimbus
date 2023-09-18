@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "load", "load\load.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "library", "library\library.vcxproj", "{5F1C3787-10C0-459F-9FEE-82A8908E9409}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hurricane", "hurricane\hurricane.vcxproj", "{AAD47A45-E3B1-4CDE-8BF4-155752E39472}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -109,6 +111,18 @@ Global
 		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x64.Build.0 = Release|x64
 		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x86.ActiveCfg = Release|Win32
 		{5F1C3787-10C0-459F-9FEE-82A8908E9409}.Release|x86.Build.0 = Release|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Debug|ARM.ActiveCfg = Debug|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Debug|x64.ActiveCfg = Debug|x64
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Debug|x64.Build.0 = Debug|x64
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Debug|x86.ActiveCfg = Debug|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Debug|x86.Build.0 = Debug|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Release|ARM.ActiveCfg = Release|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Release|ARM64.ActiveCfg = Release|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Release|x64.ActiveCfg = Release|x64
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Release|x64.Build.0 = Release|x64
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Release|x86.ActiveCfg = Release|Win32
+		{AAD47A45-E3B1-4CDE-8BF4-155752E39472}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

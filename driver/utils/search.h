@@ -2,10 +2,6 @@
 #pragma once
 #include "../Standard/base.h"
 
-#pragma warning(disable:4244)
-#pragma warning(disable: 4201)
-#pragma pack(push,4)
-
 class SearchUtils
 {
 	//pattern

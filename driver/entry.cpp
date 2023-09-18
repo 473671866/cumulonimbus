@@ -1,19 +1,13 @@
 #include "standard/base.h"
-#include "rw.h"
 #include "comm.h"
-#include "call.h"
-#include "window.h"
 #include "global.h"
+#include "routine.h"
+#include "business.h"
 #include "utils/utils.h"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
 #include "utils/version.hpp"
 #include "InfinityHook/hook.h"
-
-//TODO:
-//Ä£¿éhook
-//»úÆ÷Âë
-//Í¼±ê
 
 NTSTATUS Controller(CommPackage* package)
 {
@@ -26,7 +20,7 @@ NTSTATUS Controller(CommPackage* package)
 
 	case Command::Call: {
 		RemoteCallPackage* data = reinterpret_cast<RemoteCallPackage*>(package->buffer);
-		return RemoteCall((HANDLE)data->pid, (void*)data->shellcode, data->size);
+		return business::RemoteCall((HANDLE)data->pid, (void*)data->shellcode, data->size);
 	}
 
 	case Command::LoadLibrary_x64: {
@@ -42,7 +36,7 @@ NTSTATUS Controller(CommPackage* package)
 		}
 
 		RtlCopyMemory(filebuffer, reinterpret_cast<void*>(data->filebuffer), data->filesize);
-		auto status = LoadLibrary_x64(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
+		auto status = business::LoadLibrary_x64(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
 		utils::RtlFreeMemory(filebuffer);
 		return status;
 	}
@@ -60,7 +54,7 @@ NTSTATUS Controller(CommPackage* package)
 		}
 
 		RtlCopyMemory(filebuffer, reinterpret_cast<void*>(data->filebuffer), data->filesize);
-		auto status = LoadLibrary_x86(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
+		auto status = business::LoadLibrary_x86(reinterpret_cast<HANDLE>(data->pid), filebuffer, data->filesize, data->imagesize);
 		utils::RtlFreeMemory(filebuffer);
 		return status;
 	}
@@ -92,18 +86,18 @@ NTSTATUS Controller(CommPackage* package)
 	case Command::AllocateMemory: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
 		void* address = nullptr;
-		auto status = ProcessUtils::AllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->protect);
+		auto status = business::AllocateMemory((HANDLE)data->pid, &address, data->size, (uint32_t)data->protect);
 		data->address = reinterpret_cast<uint64_t>(address);
 		return status;
 	}
 
 	case Command::FreeMemory: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
-		return ProcessUtils::FreeMemory((HANDLE)data->pid, (void*)data->address, data->size);
+		return business::FreeProcessMemory((HANDLE)data->pid, (void*)data->address, data->size);
 	}
 
 	case Command::HideProcess: {
-		return ProcessUtils::RemoveProcessEntryList(reinterpret_cast<HANDLE>(package->buffer));
+		return business::RemoveProcessEntryList(reinterpret_cast<HANDLE>(package->buffer));
 	}
 
 	case Command::Module: {
@@ -116,30 +110,30 @@ NTSTATUS Controller(CommPackage* package)
 	}
 
 	case Command::TerminateProcess: {
-		return ProcessUtils::TerminateProcess((HANDLE)package->buffer);
+		return business::TerminateProcess((HANDLE)package->buffer);
 	}
 
 	case Command::ReadMapping: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
-		return ReadMappingMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
+		return business::ReadMappingMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
 	}
 
 	case Command::ReadPhysical: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
-		return ReadPhysicalMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
+		return business::ReadPhysicalMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
 	}
 
 	case Command::WritePhysical: {
 		MemoryPackage* data = reinterpret_cast<MemoryPackage*>(package->buffer);
-		return WritePhysicalMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
+		return business::WritePhysicalMemory((HANDLE)data->pid, (void*)data->address, (void*)data->buffer, data->size);
 	}
 
 	case Command::AntiScreenShot: {
-		return AntiScreenShot((HWND)package->buffer) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+		return routine::GreProtectSpriteContent((HWND)package->buffer) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 	}
 
 	case Command::InitializeWindowProtected: {
-		if (hook::Initialize(WindowProtected)) {
+		if (hook::Initialize(business::WindowProtected)) {
 			if (hook::Launcher()) {
 				return STATUS_SUCCESS;
 			}

@@ -64,15 +64,6 @@
     <ClCompile Include="utils\utils.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="call.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="rw.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="window.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="global.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -81,6 +72,12 @@
     </ClCompile>
     <ClCompile Include="utils\search.cpp">
       <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="business.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="routine.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -153,9 +150,6 @@
     <ClInclude Include="comm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="call.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="capstone\arm.h">
       <Filter>capstone</Filter>
     </ClInclude>
@@ -192,14 +186,8 @@
     <ClInclude Include="utils\MemLoadDll.h">
       <Filter>utils</Filter>
     </ClInclude>
-    <ClInclude Include="rw.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="pdb\analysis.h">
       <Filter>pdb</Filter>
-    </ClInclude>
-    <ClInclude Include="window.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="global.h">
       <Filter>Header Files</Filter>
@@ -248,6 +236,12 @@
     </ClInclude>
     <ClInclude Include="utils\search.h">
       <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="business.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="routine.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -188,14 +188,14 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="call.cpp" />
+    <ClCompile Include="business.cpp" />
     <ClCompile Include="comm.cpp" />
     <ClCompile Include="entry.cpp" />
     <ClCompile Include="global.cpp" />
     <ClCompile Include="hde\hde32.cpp" />
     <ClCompile Include="hde\hde64.cpp" />
     <ClCompile Include="InfinityHook\hook.cpp" />
-    <ClCompile Include="rw.cpp" />
+    <ClCompile Include="routine.cpp" />
     <ClCompile Include="standard\kernel_stl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
@@ -207,11 +207,10 @@
     <ClCompile Include="standard\typeinfo.cpp" />
     <ClCompile Include="utils\search.cpp" />
     <ClCompile Include="utils\utils.cpp" />
-    <ClCompile Include="window.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="business.h" />
     <ClInclude Include="C:\Users\47367\Downloads\InfinityHookPro-main\infinity_hook_pro\infinity_hook_pro\utils.hpp" />
-    <ClInclude Include="call.h" />
     <ClInclude Include="capstone\arm.h" />
     <ClInclude Include="capstone\arm64.h" />
     <ClInclude Include="capstone\capstone.h" />
@@ -241,9 +240,9 @@
     <ClInclude Include="ntdef.h" />
     <ClInclude Include="obapi.h" />
     <ClInclude Include="pdb\analysis.h" />
+    <ClInclude Include="routine.h" />
     <ClInclude Include="psapi.h" />
     <ClInclude Include="rtlapi.h" />
-    <ClInclude Include="rw.h" />
     <ClInclude Include="standard\base.h" />
     <ClInclude Include="standard\spcoe_exit.hpp" />
     <ClInclude Include="standard\ia32.h" />
@@ -278,7 +277,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="window.h" />
     <ClInclude Include="zwapi.h" />
   </ItemGroup>
   <ItemGroup>

@@ -78,6 +78,7 @@ BOOLEAN UpdataIAT(unsigned __int8* imagebuffer)
 			isSuccess = FALSE;
 			break;
 		}
+
 		PIMAGE_THUNK_DATA lpThuckName = (PIMAGE_THUNK_DATA)(imagebuffer + lpImportDricetory->OriginalFirstThunk);
 		PIMAGE_THUNK_DATA lpThuckFunc = (PIMAGE_THUNK_DATA)(imagebuffer + lpImportDricetory->FirstThunk);
 		for (; lpThuckName->u1.Function; ++lpThuckName, ++lpThuckFunc) {

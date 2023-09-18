@@ -1,7 +1,7 @@
 #pragma once
 #include "../Standard/base.h"
 #include "../hde/hde.h"
-#include "./memory.hpp"
+#include "memory.hpp"
 #define HOOK_FLAG 'hook'
 #define POOL_FLAG 'rest'
 
@@ -210,9 +210,9 @@ namespace hook
 		}
 
 	private:
-		std::list<InlineHookRecord*>	m_record_list;
-		ERESOURCE				m_mutex;
-		NPAGED_LOOKASIDE_LIST	m_lookaside;
+		std::list<InlineHookRecord*> m_record_list;
+		ERESOURCE m_mutex;
+		NPAGED_LOOKASIDE_LIST m_lookaside;
 	};
 
 	class PageTableHook : public Singleton<PageTableHook>
@@ -595,73 +595,8 @@ namespace hook
 		}
 
 	private:
-		ERESOURCE				m_mutex;
-		//KSPIN_LOCK m_spin_lock;
+		ERESOURCE m_mutex;
 		std::list<PageTableHookRecord*>	m_record_list;
-		NPAGED_LOOKASIDE_LIST	m_lookaside;
+		NPAGED_LOOKASIDE_LIST m_lookaside;
 	};
-
-	//struct ShadowHookRecord
-	//{
-	//	unsigned __int64 pid;
-	//	unsigned __int64 address;
-	//	unsigned __int64 handler;
-	//	unsigned __int64 original_imagebase;
-	//	unsigned __int64 copy_imagebase;
-	//	unsigned __int64 imagesize;
-	//};
-
-	//class ShadowHook
-	//{
-	//public:
-
-	//	bool Install(HANDLE pid, void* address, void* handler, void** original)
-	//	{
-	//		PEPROCESS process = nullptr;
-	//		auto status = PsLookupProcessByProcessId(pid, &process);
-	//		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
-	//		if (!NT_SUCCESS(status)) {
-	//			LOG_WARN("process non existent");
-	//			return false;
-	//		}
-
-	//		if (PsGetProcessExitStatus(process) != 0x103) {
-	//			LOG_WARN("process is termination");
-	//			return false;
-	//		}
-
-	//		KAPC_STATE apc{};
-	//		KeStackAttachProcess(process, &apc);
-
-	//		void* imagebase = 0;
-	//		auto result = RtlPcToFileHeader(address, &imagebase);
-	//		if (result) {
-	//			auto nt_headers = RtlImageNtHeader(imagebase);
-	//			void* base = nullptr;
-	//			size_t region_szie = nt_headers->OptionalHeader.SizeOfImage;
-	//			status = ZwAllocateVirtualMemory(NtCurrentProcess(), &base, 0, &region_szie, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	//			if (NT_SUCCESS(status)) {
-	//				RtlZeroMemory(base, region_szie);
-	//				RtlCopyMemory(base, imagebase, nt_headers->OptionalHeader.SizeOfImage);
-	//				unsigned long old = 0;
-	//				status = ZwProtectVirtualMemory(NtCurrentProcess(), &imagebase, nt_headers->OptionalHeader.SizeOfImage, PAGE_NOACCESS, &old);
-	//				if (NT_SUCCESS(status)) {
-	//					ShadowHookRecord record{};
-	//					record.pid = pid;
-	//					record.address = address;
-	//					record.handler = handler;
-	//					record.original_imagebase = imagebase;
-	//					record.copy_imagebase = base;
-	//					record.imagesize = nt_headers->OptionalHeader.SizeOfImage;
-	//				}
-	//			}
-	//		}
-
-	//		KeUnstackDetachProcess(&apc);
-	//	}
-
-	//	long ExceptionHandler(EXCEPTION_RECORD exception_record, CONTEXT ctx)
-	//	{
-	//	}
-	//};
 }
