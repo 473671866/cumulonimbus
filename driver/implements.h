@@ -1,6 +1,7 @@
 #pragma once
 #include "standard/base.h"
-namespace routine
+
+namespace impl
 {
 	PETHREAD PsGetNextProcessThread(
 		IN PEPROCESS Process,
@@ -31,7 +32,11 @@ namespace routine
 		IN PVOID AttributeList
 	);
 
-	PVOID ExpLookupHandleTableEntry(PVOID PspCidTable, HANDLE ProcessId);
+	PVOID ExpLookupHandleTableEntry(
+		IN PVOID PspCidTable,
+		IN HANDLE ProcessId
+		IN
+	);
 
-	BOOL GreProtectSpriteContent(HWND hwnd);
+	BOOL GreProtectSpriteContent(IN HWND hwnd);
 };

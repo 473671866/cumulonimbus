@@ -8,7 +8,7 @@ cd %projectpath%
 
 set "SignFullPath=%preProjectpath%\x64\Debug\load.sys"
 
-@rem D:\DSignTool\CSignTool.exe sign /r landong /f %SignFullPath% /ac
+D:\DSignTool\CSignTool.exe sign /r landong /f %SignFullPath% /ac
 
 builder.exe %SignFullPath% F:\Code\Kernel\cumolonimbus\library
 

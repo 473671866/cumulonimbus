@@ -45,7 +45,7 @@ DWORD GetPid()
 
 int main()
 {
-	//std::thread(print).detach();
+	std::thread(print).detach();
 
 	int code = 0;
 	HMODULE hmodule = LoadLibraryA("library.dll");
@@ -69,18 +69,18 @@ int main()
 	//RegisterKeyProc RegisterKey = (RegisterKeyProc)GetProcAddress(hmodule, "RegisterKey");
 	//RegisterKey("CUMOBKNE2N8TCW22WXHV54G004AI8VDD");
 
-	////加载驱动
-	//LauncherProc Launcher = (LauncherProc)GetProcAddress(hmodule, "Launcher");
-	//code = Launcher();
-	//if (code != 0) {
-	//	std::cerr << "加载驱动失败, 错误代码: " << code << "\n";
-	//	system("pause");
-	//}
-	//else {
-	//	std::cout << "加载驱动成功\n";
-	//}
+	//加载驱动
+	LauncherProc Launcher = (LauncherProc)GetProcAddress(hmodule, "Launcher");
+	code = Launcher();
+	if (code != 0) {
+		std::cerr << "加载驱动失败, 错误代码: " << code << "\n";
+		system("pause");
+	}
+	else {
+		std::cout << "加载驱动成功\n";
+	}
 
-	//auto pid = GetCurrentProcessId();
+	auto pid = GetCurrentProcessId();
 
 	////模块
 	//system("pause");
@@ -210,17 +210,17 @@ int main()
 	//else {
 	//	std::cerr << "释放内存失败\n";
 	//}
-	//system("pause");
 
 	//隐藏进程
 	HideProcessProc HideProcess = (HideProcessProc)GetProcAddress(hmodule, "HideProcess");
-	bool success = HideProcess(GetCurrentProcessId());
+	auto success = HideProcess(7684);
 	if (success) {
 		std::cout << "隐藏进程成功\n";
 	}
 	else {
 		std::cerr << "隐藏进程失败\n";
 	}
+	system("pause");
 
 	//system("pause");
 	//结束进程

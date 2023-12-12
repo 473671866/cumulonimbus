@@ -50,30 +50,6 @@ NTSTATUS ControlDispath(DEVICE_OBJECT* DeviceObject, IRP* Irp)
 		RtlFreePool(filebuffer);
 	}
 
-	//PVOID hsection = NULL;
-	//OBJECT_ATTRIBUTES attributes = { 0 };
-	//InitializeObjectAttributes(&attributes, NULL, OBJ_CASE_INSENSITIVE, NULL, NULL);
-	//LARGE_INTEGER section_size = { .QuadPart = length };
-	//status = MmCreateSection(&hsection, SECTION_ALL_ACCESS, &attributes, &section_size, PAGE_EXECUTE_READWRITE, 0x1000000, NULL, NULL);
-	//if (!NT_SUCCESS(status)) {
-	//	return status;
-	//}
-
-	//void* section_view = 0;
-	//SIZE_T view_size = 0;
-	//status = ZwMapViewOfSection(hsection, ZwCurrentProcess(), &section_view, NULL, package->filesize, NULL, &view_size, ViewUnmap, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	//if (!NT_SUCCESS(status)) {
-	//	return status;
-	//}
-
-	//RtlCopyMemory(section_view, package->filebuffer, package->filesize);
-
-	//void* mapping = 0;
-	//status = MmMapViewInSystemSpace(hsection, &mapping, &view_size);
-	//if (!NT_SUCCESS(status)) {
-	//	return status;
-	//}
-
 	UNREFERENCED_PARAMETER(DeviceObject);
 	return status;
 }
@@ -86,15 +62,6 @@ VOID DriverUnload(PDRIVER_OBJECT driver_object)
 	if (driver_object->DeviceObject) {
 		IoDeleteDevice(driver_object->DeviceObject);
 	}
-
-	//PKLDR_DATA_TABLE_ENTRY LdrTableEntry = (PKLDR_DATA_TABLE_ENTRY)driver_object->DriverSection;
-	//if (LdrTableEntry) {
-	//	SelfDeleteFile(LdrTableEntry->FullDllName.Buffer);
-	//}
-
-	//if (g_register_path) {
-	//	DeleteRegisterPath(g_register_path);
-	//}
 
 	KdPrintEx((77, 0, "driver unload\n"));
 }

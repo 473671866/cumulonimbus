@@ -9,6 +9,9 @@ namespace loader
 		unsigned __int64 filebuffer;
 	};
 
+	/// @brief 获取随机字符串
+	/// @param length 字符串长度
+	/// @return
 	std::string RandomString(const int length)
 	{
 		std::string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -25,7 +28,12 @@ namespace loader
 		return randomstring;
 	}
 
-	bool GenerateDriver(std::filesystem::path driverpath, unsigned char* filebuffer, unsigned long filesize)
+	/// @brief 生成驱动
+	/// @param driverpath 生成路径
+	/// @param filebuffer 驱动文件
+	/// @param filesize 文件大小
+	/// @return
+	bool GenerateDriver(std::filesystem::path driverpath, unsigned char* filebuffer, size_t filesize)
 	{
 		std::ofstream stream(driverpath, std::ios::binary);
 		if (!stream.is_open()) {
@@ -45,6 +53,10 @@ namespace loader
 		return !stream.fail();
 	}
 
+	/// @brief 加载驱动
+	/// @param dirverpath 驱动路径
+	/// @param service_name 服务名
+	/// @return
 	bool LoadDriver(std::filesystem::path dirverpath, std::string service_name)
 	{
 		SC_HANDLE hmanager = OpenSCManagerA(NULL, NULL, SC_MANAGER_ALL_ACCESS);
@@ -66,6 +78,9 @@ namespace loader
 		return success;
 	}
 
+	/// @brief 卸载驱动
+	/// @param service_name 服务名
+	/// @return
 	bool UnLoadDriver(std::string service_name)
 	{
 		SC_HANDLE hmanager = OpenSCManagerA(NULL, NULL, SC_MANAGER_ALL_ACCESS);
@@ -88,7 +103,11 @@ namespace loader
 		return DeleteService(hservice);
 	}
 
-	bool MappingDriver(unsigned char* filebuffer, unsigned long filesize)
+	/// @brief 映射驱动
+	/// @param filebuffer 驱动文件
+	/// @param filesize 文件大小
+	/// @return
+	bool MappingDriver(unsigned char* filebuffer, size_t filesize)
 	{
 		HANDLE hdevice = CreateFileA("\\\\.\\ljw", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (!hdevice) {

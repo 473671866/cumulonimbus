@@ -1,9 +1,5 @@
 #include "business.h"
-#include "global.h"
-#include "routine.h"
-#include "pdb/analysis.h"
-#include "utils/utils.h"
-#include "utils/search.h"
+#include "utils/search.hpp"
 #include "utils/memory.hpp"
 #include "utils/process.hpp"
 #include "utils/version.hpp"
@@ -24,8 +20,8 @@ namespace business
 	{
 		static uint64_t offset = 0;
 		if (offset == 0) {
-			auto version = Version::get_instance();
-			if (version->Windows_7()) {
+			auto version = utils::version::get_instance();
+			if (version->windows_7()) {
 				offset = 0x1d8;
 			}
 			else {
@@ -41,8 +37,8 @@ namespace business
 	{
 		static uint64_t offset = 0;
 		if (offset == 0) {
-			auto version = Version::get_instance();
-			if (version->Windows_7()) {
+			auto version = utils::version::get_instance();
+			if (version->windows_7()) {
 				offset = 0x3b0;
 			}
 			else {
@@ -58,8 +54,8 @@ namespace business
 	{
 		static uint64_t offset = 0;
 		if (offset == 0) {
-			auto version = Version::get_instance();
-			if (version->Windows_7()) {
+			auto version = utils::version::get_instance();
+			if (version->windows_7()) {
 				offset = 0x388;
 			}
 			else {
@@ -75,8 +71,8 @@ namespace business
 	{
 		static uint64_t offset = 0;
 		if (offset == 0) {
-			auto version = Version::get_instance();
-			if (version->Windows_7()) {
+			auto version = utils::version::get_instance();
+			if (version->windows_7()) {
 				offset = 0x410;
 			}
 			else {
@@ -92,8 +88,8 @@ namespace business
 	{
 		static uint64_t offset = 0;
 		if (offset == 0) {
-			auto version = Version::get_instance();
-			if (version->Windows_7()) {
+			auto version = utils::version::get_instance();
+			if (version->windows_7()) {
 				offset = 0x420;
 			}
 			else {
@@ -105,36 +101,9 @@ namespace business
 		return offset;
 	}
 
-	NTSTATUS ReadMappingMemory(HANDLE pid, void* address, void* buffer, size_t size)
-	{
-		if (!utils::ProbeUserAddress(address, size, 1) || !utils::ProbeUserAddress(buffer, size, 1)) {
-			return STATUS_INVALID_ADDRESS;
-		}
-
-		void* temp = utils::RtlAllocateMemory(PagedPool, size);
-		if (temp == nullptr) {
-			return STATUS_MEMORY_NOT_ALLOCATED;
-		}
-
-		ProcessUtils prc;
-		auto status = prc.StackAttachProcess(pid);
-		if (!NT_SUCCESS(status)) {
-			return status;
-		}
-
-		if (MmIsAddressValid(address)) {
-			RtlCopyMemory(temp, address, size);
-		}
-
-		prc.UnStackAttachProcess();
-		RtlCopyMemory(buffer, temp, size);
-		utils::RtlFreeMemory(temp);
-		return status;
-	}
-
 	NTSTATUS ReadPhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size)
 	{
-		if (!utils::ProbeUserAddress(address, size, 1) || !utils::ProbeUserAddress(buffer, size, 1)) {
+		if (!utils::memory::probe(address, size, 1) || !utils::memory::probe(buffer, size, 1)) {
 			return STATUS_INVALID_ADDRESS;
 		}
 
@@ -150,7 +119,7 @@ namespace business
 			return status;
 		}
 
-		void* temp = utils::RtlAllocateMemory(PagedPool, size);
+		void* temp = utils::memory::malloc(PagedPool, size);
 		if (temp == nullptr) {
 			return STATUS_MEMORY_NOT_ALLOCATED;
 		}
@@ -171,14 +140,14 @@ namespace business
 		KeLeaveCriticalRegion();
 
 		RtlCopyMemory(buffer, temp, size);
-		utils::RtlFreeMemory(temp);
+		utils::memory::free(temp);
 
 		return status;
 	}
 
 	NTSTATUS WritePhysicalMemory(HANDLE pid, void* address, void* buffer, size_t size)
 	{
-		if (!utils::ProbeUserAddress(address, size, 1) || !utils::ProbeUserAddress(buffer, size, 1)) {
+		if (!utils::memory::probe(address, size, 1) || !utils::memory::probe(buffer, size, 1)) {
 			return STATUS_INVALID_ADDRESS;
 		}
 
@@ -194,7 +163,7 @@ namespace business
 			return status;
 		}
 
-		void* temp = utils::RtlAllocateMemory(PagedPool, size);
+		void* temp = utils::memory::malloc(PagedPool, size);
 		if (temp == nullptr) {
 			return STATUS_MEMORY_NOT_ALLOCATED;
 		}
@@ -220,7 +189,7 @@ namespace business
 		__writecr3(system_dicetory);
 		KeLeaveCriticalRegion();
 
-		utils::RtlFreeMemory(temp);
+		utils::memory::free(temp);
 
 		return status;
 	}
@@ -268,6 +237,11 @@ namespace business
 		return;
 	}
 
+	/// @brief 远程call
+	/// @param pid
+	/// @param shellcode
+	/// @param size
+	/// @return
 	NTSTATUS RemoteCall(HANDLE pid, void* shellcode, size_t size)
 	{
 		//获取进程
@@ -285,7 +259,7 @@ namespace business
 		}
 
 		//获取主线程
-		PETHREAD  thread = routine::PsGetNextProcessThread(process, nullptr);
+		PETHREAD  thread = impl::PsGetNextProcessThread(process, nullptr);
 		auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 		if (thread == nullptr) {
 			return STATUS_THREAD_NOT_IN_PROCESS;
@@ -427,6 +401,12 @@ namespace business
 		return status;
 	}
 
+	/// @brief x64注入
+	/// @param pid
+	/// @param filebuffer
+	/// @param filesize
+	/// @param imagesize
+	/// @return
 	NTSTATUS LoadLibrary_x64(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
 	{
 		if (pid == 0 || filebuffer == nullptr || filesize == 0 || imagesize == 0) {
@@ -438,29 +418,29 @@ namespace business
 		auto status = PsLookupProcessByProcessId(pid, &process);
 		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("process not exist");
 			return status;
 		}
 
 		//进程是否在运行
 		status = PsGetProcessExitStatus(process);
 		if (status != 0x103) {
+			LOG_INFO("process is terminating");
 			return STATUS_PROCESS_IS_TERMINATING;
 		}
 
 		//获取主线程
-		PETHREAD  thread = routine::PsGetNextProcessThread(process, nullptr);
+		PETHREAD thread = routine::PsGetNextProcessThread(process, nullptr);
 		auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 		if (thread == nullptr) {
+			LOG_INFO("thread no exits");
 			return STATUS_THREAD_NOT_IN_PROCESS;
 		}
-
-		//if (PsGetThreadExitStatus(thread) != 0x103){
-		//	return STATUS_THREAD_IS_TERMINATING;
-		//}
 
 		//挂起线程
 		status = routine::PsSuspendThread(thread, nullptr);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("suspend thread failed");
 			return status;
 		}
 
@@ -473,6 +453,7 @@ namespace business
 		size_t library_file_buffer_size = filesize;
 		status = ZwAllocateVirtualMemory(NtCurrentProcess(), &library_file_buffer, 0, &library_file_buffer_size, MEM_COMMIT, PAGE_READWRITE);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("allocate file memory failed");
 			return status;
 		}
 
@@ -481,6 +462,7 @@ namespace business
 		size_t library_image_buffer_size = imagesize;
 		status = ZwAllocateVirtualMemory(NtCurrentProcess(), &library_image_buffer, 0, &library_image_buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("allocate image memory failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
 			return status;
 		}
@@ -490,6 +472,7 @@ namespace business
 		size_t shell_code_buffer_size = sizeof(MemLoadShellcode_x64) + PAGE_SIZE;
 		status = ZwAllocateVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, 0, &shell_code_buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("allocate shellcode memory failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), &library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
 			return status;
@@ -565,6 +548,7 @@ namespace business
 		//恢复线程
 		status = routine::PsResumeThread(thread, nullptr);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("resume thread failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), &library_file_buffer, &library_file_buffer_size, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), &library_image_buffer, &library_image_buffer_size, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shell_code_buffer, &shell_code_buffer_size, MEM_RELEASE);
@@ -607,15 +591,31 @@ namespace business
 		return status;
 	}
 
+	/// @brief x86注入
+	/// @param pid
+	/// @param filebuffer
+	/// @param filesize
+	/// @param imagesize
+	/// @return
 	NTSTATUS LoadLibrary_x86(HANDLE pid, void* filebuffer, size_t filesize, size_t imagesize)
 	{
+		//获取进程
 		PEPROCESS process = nullptr;
 		auto status = PsLookupProcessByProcessId(pid, &process);
 		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("process not exist");
 			return status;
 		}
 
+		//进程是否在运行
+		status = PsGetProcessExitStatus(process);
+		if (status != 0x103) {
+			LOG_INFO("process is terminating");
+			return STATUS_PROCESS_IS_TERMINATING;
+		}
+
+		//附加
 		KAPC_STATE apc{};
 		KeStackAttachProcess(process, &apc);
 		auto detach = std::experimental::make_scope_exit([&apc] {	KeUnstackDetachProcess(&apc); });
@@ -625,7 +625,7 @@ namespace business
 		void* filebase = nullptr;
 		status = ZwAllocateVirtualMemory(NtCurrentProcess(), &filebase, 0, &regionsize, MEM_COMMIT, PAGE_READWRITE);
 		if (!NT_SUCCESS(status)) {
-			KeUnstackDetachProcess(&apc);
+			LOG_INFO("allocate file memory failed");
 			return status;
 		}
 
@@ -634,8 +634,8 @@ namespace business
 		void* imagebuffer = nullptr;
 		status = ZwAllocateVirtualMemory(NtCurrentProcess(), &imagebuffer, 0, &image_region, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("allocate image memory failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
-			KeUnstackDetachProcess(&apc);
 			return status;
 		}
 
@@ -644,9 +644,9 @@ namespace business
 		uint8_t* shellcodebuffer = nullptr;
 		status = ZwAllocateVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, 0, &shellcode_region_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("allocate shellcode memory failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), &imagebuffer, &image_region, MEM_RELEASE);
-			KeUnstackDetachProcess(&apc);
 			return status;
 		}
 
@@ -685,10 +685,12 @@ namespace business
 
 #pragma warning(pop)
 
+		//创建线程
 		HANDLE hthread = nullptr;
 		auto hthread_close = std::experimental::make_scope_exit([hthread] {if (hthread)ZwClose(hthread); });
 		status = routine::ZwCreateThreadEx(&hthread, THREAD_ALL_ACCESS, NULL, NtCurrentProcess(), shellcodebuffer, filebase, 0, 0, 0x100000, 0x200000, NULL);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("create thread failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
@@ -698,6 +700,7 @@ namespace business
 		auto dereference_thread = std::experimental::make_scope_exit([thread] {if (thread)ObDereferenceObject(thread); });
 		status = ObReferenceObjectByHandle(hthread, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, (void**)&thread, NULL);
 		if (!NT_SUCCESS(status)) {
+			LOG_INFO("get thread object failed");
 			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&imagebuffer, &image_region, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), &filebase, &regionsize, MEM_RELEASE);
 			ZwFreeVirtualMemory(NtCurrentProcess(), (void**)&shellcodebuffer, &shellcode_region_size, MEM_RELEASE);
@@ -728,7 +731,10 @@ namespace business
 		return status;
 	}
 
-	NTSTATUS RemoveProcessEntryList(HANDLE pid)
+	/// @brief 隐藏进程
+	/// @param pid
+	/// @return
+	NTSTATUS HideProcess(HANDLE pid)
 	{
 		//取进程对象
 		PEPROCESS process = nullptr;
@@ -737,448 +743,46 @@ namespace business
 			return status;
 		}
 
+		//进程是否在运行
 		status = PsGetProcessExitStatus(process);
 		if (status != 0x103) {
 			ObDereferenceObject(process);
 			return status;
 		}
 
-		LOG_INFO("RemoveProcessEntryList\n");
+		analysis::Pdber* ntos = analysis::Ntoskrnl();
+		//ActiveProcessLinks
+		uint64_t ActiveProcessLinksOffset = ntos->GetOffset("_EPROCESS", "ActiveProcessLinks");
+		PLIST_ENTRY list = (PLIST_ENTRY)((char*)process + ActiveProcessLinksOffset);
+		RemoveEntryList(list);
+		InitializeListHead(list);
 
-		auto version = Version::get_instance();
-		if (version->Windows_7()) {
-			//ActiveProcessLinks
-			uint64_t ActiveProcessLinksOffset = 0x188;
-			PLIST_ENTRY list = (PLIST_ENTRY)((char*)process + ActiveProcessLinksOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
+		//ProcessListEntry
+		uint64_t ProcessListEntryOffset = ntos->GetOffset("_KPROCESS", "ProcessListEntry");
+		list = (PLIST_ENTRY)((char*)process + ProcessListEntryOffset);
+		RemoveEntryList(list);
+		InitializeListHead(list);
 
-			//ProcessListEntry
-			uint64_t ProcessListEntryOffset = 0xe0;
-			list = (PLIST_ENTRY)((char*)process + ProcessListEntryOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
+		//ObjectTable
+		uint64_t ObjectTableOffset = ntos->GetOffset("_EPROCESS", "ObjectTable");
+		char* ObjectTable = (char*)*(void**)((char*)process + ObjectTableOffset);
 
-			//ObjectTable
-			uint64_t ObjectTableOffset = 0x200;
-			char* ObjectTable = (char*)*(void**)((char*)process + ObjectTableOffset);
+		//HandleTableList
+		uint64_t HandleTableListOffset = ntos->GetOffset("_HANDLE_TABLE", "HandleTableList");
+		list = (PLIST_ENTRY)((char*)ObjectTable + HandleTableListOffset);
+		RemoveEntryList(list);
+		InitializeListHead(list);
 
-			//HandleTableList
-			uint64_t HandleTableListOffset = 0x20;
-			list = (PLIST_ENTRY)((char*)ObjectTable + HandleTableListOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ExpLookupHandleTableEntry
-			//PspCidTable
-			UNICODE_STRING name{};
-			RtlInitUnicodeString(&name, L"PsLookupProcessByProcessId");
-			unsigned __int8* temp = (unsigned __int8*)MmGetSystemRoutineAddress(&name);
-			LARGE_INTEGER result{};
-			for (int i = 0; temp[i] != 0xc3; i++) {
-				if (temp[i] == 0x48 && temp[i + 1] == 0x8b && temp[i + 2] == 0x0d) {
-					result.QuadPart = (LONGLONG)temp + i + 7;
-					result.LowPart += *(PULONG)(temp + i + 3);
-					break;
-				}
-			}
-			PVOID PspCidTable = reinterpret_cast<PVOID>(result.QuadPart);
-			LOG_INFO("PspCidTable: %llx", PspCidTable);
-			PVOID entry = routine::ExpLookupHandleTableEntry(PspCidTable, pid);
-			if (MmIsAddressValid(entry)) {
-				RtlZeroMemory(entry, sizeof(entry));
-				uint64_t UniqueProcessIdOffset = 0x180;
-				*(PHANDLE)((char*)process + UniqueProcessIdOffset) = 0;
-			}
-		}
-		else {
-			analysis::Pdber* ntos = analysis::Ntoskrnl();
-			//ActiveProcessLinks
-			uint64_t ActiveProcessLinksOffset = ntos->GetOffset("_EPROCESS", "ActiveProcessLinks");
-			PLIST_ENTRY list = (PLIST_ENTRY)((char*)process + ActiveProcessLinksOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ProcessListEntry
-			uint64_t ProcessListEntryOffset = ntos->GetOffset("_KPROCESS", "ProcessListEntry");
-			list = (PLIST_ENTRY)((char*)process + ProcessListEntryOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//ObjectTable
-			uint64_t ObjectTableOffset = ntos->GetOffset("_EPROCESS", "ObjectTable");
-			char* ObjectTable = (char*)*(void**)((char*)process + ObjectTableOffset);
-
-			//HandleTableList
-			uint64_t HandleTableListOffset = ntos->GetOffset("_HANDLE_TABLE", "HandleTableList");
-			list = (PLIST_ENTRY)((char*)ObjectTable + HandleTableListOffset);
-			RemoveEntryList(list);
-			InitializeListHead(list);
-
-			//PspCidTable
-			PVOID PspCidTable = reinterpret_cast<PVOID>(ntos->GetPointer("PspCidTable"));
-			PVOID entry = routine::ExpLookupHandleTableEntry(PspCidTable, pid);
-			if (MmIsAddressValid(entry)) {
-				RtlZeroMemory(entry, sizeof(entry));
-				uint64_t UniqueProcessIdOffset = ntos->GetOffset("_EPROCESS", "UniqueProcessId");
-				*(PHANDLE)((char*)process + UniqueProcessIdOffset) = 0;
-			}
+		//PspCidTable
+		PVOID PspCidTable = reinterpret_cast<PVOID>(ntos->GetPointer("PspCidTable"));
+		PVOID entry = impl::ExpLookupHandleTableEntry(PspCidTable, pid);
+		if (MmIsAddressValid(entry)) {
+			RtlZeroMemory(entry, sizeof(entry));
+			uint64_t UniqueProcessIdOffset = ntos->GetOffset("_EPROCESS", "UniqueProcessId");
+			*(PHANDLE)((char*)process + UniqueProcessIdOffset) = 0;
 		}
 
 		ObDereferenceObject(process);
 		return status;
-	}
-
-	NTSTATUS AllocateMemory(HANDLE pid, void** address, size_t size, uint32_t protect)
-	{
-		//获取进程
-		PEPROCESS process = nullptr;
-		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
-		auto status = PsLookupProcessByProcessId(pid, &process);
-		if (!NT_SUCCESS(status)) {
-			return status;
-		}
-
-		if (PsGetProcessExitStatus(process) != 0x103) {
-			return STATUS_PROCESS_IS_TERMINATING;
-		}
-
-		KAPC_STATE apc{};
-		KeStackAttachProcess(process, &apc);
-
-		void* allocate_base = nullptr;
-		size_t region_size = size;
-		status = ZwAllocateVirtualMemory(NtCurrentProcess(), &allocate_base, 0, &region_size, MEM_COMMIT, protect);
-		if (NT_SUCCESS(status)) {
-			RtlZeroMemory(allocate_base, size);
-		}
-
-		KeUnstackDetachProcess(&apc);
-
-		if (NT_SUCCESS(status) && address) {
-			*address = allocate_base;
-		}
-		return status;
-	}
-
-	NTSTATUS FreeProcessMemory(HANDLE pid, void* address, size_t size)
-	{
-		PEPROCESS process = nullptr;
-		auto dereference_process = std::experimental::make_scope_exit([process] {if (process)ObDereferenceObject(process); });
-		auto status = PsLookupProcessByProcessId(pid, &process);
-		if (!NT_SUCCESS(status)) {
-			return status;
-		}
-
-		if (PsGetProcessExitStatus(process) != 0x103) {
-			return STATUS_PROCESS_IS_TERMINATING;
-		}
-
-		KAPC_STATE apc{};
-		KeStackAttachProcess(process, &apc);
-
-		void* allocate_base = address;
-		size_t region_size = size;
-		status = ZwFreeVirtualMemory(NtCurrentProcess(), &allocate_base, &region_size, MEM_RELEASE);
-
-		KeUnstackDetachProcess(&apc);
-		return status;
-	}
-
-	NTSTATUS TerminateProcess(HANDLE pid)
-	{
-		CLIENT_ID clientid{  };
-		clientid.UniqueProcess = pid;
-
-		OBJECT_ATTRIBUTES attribute{  };
-		attribute.Length = sizeof(OBJECT_ATTRIBUTES);
-
-		HANDLE handle = nullptr;
-		auto status = ZwOpenProcess(&handle, PROCESS_ALL_ACCESS, &attribute, &clientid);
-		if (!NT_SUCCESS(status) || !handle) {
-			return status;
-		}
-
-		status = ZwTerminateProcess(handle, STATUS_SUCCESS);
-		ZwClose(handle);
-		return status;
-	}
-
-	/*----------------------------------------获取前置窗口-------------------------------------*/
-	uint64_t GetZwUserGetForegroundWindowAddress()
-	{
-		static uint64_t address = 0;
-		if (address == 0) {
-			PEPROCESS process = nullptr;
-			auto status = utils::LookupProcessByImageFileName("explorer.exe", &process);
-			if (NT_SUCCESS(status)) {
-				KAPC_STATE apc{};
-				KeStackAttachProcess(process, &apc);
-				auto version = Version::get_instance();
-				if (version->Windows_7()) {
-					SearchUtils search;
-					address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***5748***48******FF15****4C******33DB4C3BDB74*4939**74*498B**FF15****488B**4839*****75*488B1F");
-				}
-				else {
-					analysis::Pdber* win32 = analysis::Win32k();
-					address = win32->GetPointer("NtUserGetForegroundWindow");
-				}
-				LOG_DEBUG("%llx", address);
-				KeUnstackDetachProcess(&apc);
-				ObDereferenceObject(process);
-			}
-		}
-
-		return address;
-	}
-
-	PVOID NtUserGetForegroundWindow()
-	{
-		typedef PVOID(NTAPI* NtUserGetForegroundWindowProc)(VOID);
-		NtUserGetForegroundWindowProc proc = reinterpret_cast<NtUserGetForegroundWindowProc>(GetZwUserGetForegroundWindowAddress());
-
-		PVOID hwnd = proc();
-
-		auto collection = GetGlobalVector();
-		auto cmp = [hwnd](uint64_t WindowsHandle) {return reinterpret_cast<uint64_t>(hwnd) == WindowsHandle; };
-		if (find_if(collection->begin(), collection->end(), cmp) != collection->end()) {
-			return NULL;
-		}
-
-		return hwnd;
-	}
-
-	/*----------------------------------------根据坐标获取窗口-------------------------------------*/
-	uint64_t GetZwUserWindowFromPointAddress()
-	{
-		static uint64_t address = 0;
-		if (address == 0) {
-			PEPROCESS process = nullptr;
-			auto status = utils::LookupProcessByImageFileName("explorer.exe", &process);
-			if (NT_SUCCESS(status)) {
-				KAPC_STATE apc{};
-				KeStackAttachProcess(process, &apc);
-				auto version = Version::get_instance();
-				if (version->Windows_7()) {
-					SearchUtils search;
-					address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***4889***5748***48******FF15****C6******48******E8****");
-				}
-				else {
-					analysis::Pdber* win32 = analysis::Win32k();
-					address = win32->GetPointer("NtUserWindowFromPoint");
-				}
-				LOG_DEBUG("%llx", address);
-				KeUnstackDetachProcess(&apc);
-				ObDereferenceObject(process);
-			}
-		}
-
-		return address;
-	}
-
-	PVOID NtUserWindowFromPoint(PVOID Point)
-	{
-		typedef PVOID(NTAPI* NtUserWindowFromPointProc)(PVOID Point);
-		NtUserWindowFromPointProc proc = reinterpret_cast<NtUserWindowFromPointProc>(GetZwUserWindowFromPointAddress());
-		PVOID hwnd = proc(Point);
-
-		auto collection = GetGlobalVector();
-		auto cmp = [hwnd](uint64_t WindowsHandle) {return reinterpret_cast<uint64_t>(hwnd) == WindowsHandle; };
-		if (find_if(collection->begin(), collection->end(), cmp) != collection->end()) {
-			return NULL;
-		}
-		return hwnd;
-	}
-
-	/*----------------------------------------遍历窗口-------------------------------------*/
-	uint64_t GetNtUserBuildHwndListAddress()
-	{
-		static uint64_t address = 0;
-		if (address == 0) {
-			PEPROCESS process = nullptr;
-			auto status = utils::LookupProcessByImageFileName("explorer.exe", &process);
-			if (NT_SUCCESS(status)) {
-				KAPC_STATE apc{};
-				KeStackAttachProcess(process, &apc);
-				auto version = Version::get_instance();
-				if (version->Windows_7()) {
-					SearchUtils search;
-					address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***4889***4889***41544155415648***418BD9458BF0488BFA488BF14533E4458D***48******FF15****");
-				}
-				else {
-					analysis::Pdber* win32 = analysis::Win32k();
-					address = win32->GetPointer("NtUserBuildHwndList");
-				}
-				KeUnstackDetachProcess(&apc);
-				ObDereferenceObject(process);
-			}
-		}
-		return address;
-	}
-
-#pragma  warning(push)
-#pragma warning(disable:4702)
-
-	NTSTATUS NtUserBuildHwndList(PVOID a1, PVOID a2, PVOID Address, unsigned int a4, ULONG count, PVOID Addressa, PULONG pretCount)
-	{
-		typedef NTSTATUS(NTAPI* MyNtUserBuildHwndListProc)(PVOID a1, PVOID a2, PVOID Address, unsigned int a4, ULONG count, PVOID Addressa, PULONG pretCount);
-		MyNtUserBuildHwndListProc 	proc = reinterpret_cast<MyNtUserBuildHwndListProc>(GetNtUserBuildHwndListAddress());
-		NTSTATUS status = proc(a1, a2, Address, a4, count, Addressa, pretCount);
-
-		if (!NT_SUCCESS(status)) {
-			return status;
-		}
-
-		if (!MmIsAddressValid(pretCount) || !MmIsAddressValid(Addressa)) {
-			return status;
-		}
-
-		int scount = *pretCount;//数组大小
-		PVOID* arrays = reinterpret_cast<PVOID*>(Addressa);	//窗口句柄数组
-
-		for (int i = 0; i < scount; i++)
-		{
-			PVOID Hwnd = arrays[i];//窗口句柄
-			auto collection = GetGlobalVector();
-			auto cmp = [Hwnd](uint64_t WindowsHandle) {return reinterpret_cast<uint64_t>(Hwnd) == WindowsHandle; };
-			if (find_if(collection->begin(), collection->end(), cmp) != collection->end()) {
-				return status;
-			}
-			//找到了
-			if (i == 0)
-			{
-				if (scount == 1)
-				{
-					arrays[i] = 0;
-					*pretCount = 0;
-					break;
-				}
-				arrays[i] = arrays[i + 1];
-				break;
-			}
-			else
-			{
-				arrays[i] = arrays[i - 1];
-				break;
-			}
-		}
-		return status;
-	}
-#pragma warning(pop)
-
-	/*----------------------------------------查询窗口-------------------------------------*/
-	uint64_t GetNtUserQueryWindowAddress()
-	{
-		static uint64_t address = 0;
-		if (address == 0) {
-			PEPROCESS process = nullptr;
-			auto status = utils::LookupProcessByImageFileName("explorer.exe", &process);
-			if (NT_SUCCESS(status)) {
-				KAPC_STATE apc{};
-				KeStackAttachProcess(process, &apc);
-				auto version = Version::get_instance();
-				if (version->Windows_7()) {
-					SearchUtils search;
-					address = (unsigned __int64)search.pattern("win32k.sys", ".text", "4889***5748***488BD948******8BFAFF15****488BCBE8****488BD84885C075*");
-				}
-				else {
-					analysis::Pdber* win32 = analysis::Win32k();
-					address = win32->GetPointer("NtUserQueryWindow");
-				}
-				LOG_DEBUG("%llx", address);
-				KeUnstackDetachProcess(&apc);
-				ObDereferenceObject(process);
-			}
-		}
-		return address;
-	}
-
-	uint64_t NtUserQueryWindow(IN PVOID hwnd, IN ULONG TypeInformation)
-	{
-		typedef uint64_t(NTAPI* MyNtUserQueryWindowProc)(PVOID Hwnd, int flags);
-		MyNtUserQueryWindowProc proc = (MyNtUserQueryWindowProc)GetNtUserQueryWindowAddress();
-
-		auto collection = GetGlobalVector();
-		auto cmp = [hwnd](uint64_t WindowsHandle) {return reinterpret_cast<uint64_t>(hwnd) == WindowsHandle; };
-		if (find_if(collection->begin(), collection->end(), cmp) != collection->end()) {
-			return NULL;
-		}
-		return proc(hwnd, TypeInformation);
-	}
-
-	/*----------------------------------------查找窗口-------------------------------------*/
-	uint64_t GetNtUserFindWindowExAddress()
-	{
-		static uint64_t address = 0;
-		if (address == 0) {
-			PEPROCESS process = nullptr;
-			auto status = utils::LookupProcessByImageFileName("explorer.exe", &process);
-			if (NT_SUCCESS(status)) {
-				KAPC_STATE apc{};
-				KeStackAttachProcess(process, &apc);
-				auto version = Version::get_instance();
-				if (version->Windows_7()) {
-					SearchUtils search;
-					address = (unsigned __int64)search.pattern("win32k.sys", ".text", "488BC44889**4889**4889**4C89**415548***4D8BE94D8BE0488BF2488BF948******FF15****");
-				}
-				else {
-					analysis::Pdber* win32 = analysis::Win32k();
-					address = win32->GetPointer("NtUserFindWindowEx");
-				}
-				LOG_DEBUG("%llx", address);
-				KeUnstackDetachProcess(&apc);
-				ObDereferenceObject(process);
-			}
-		}
-		return address;
-	}
-
-	PVOID NtUserFindWindowEx(
-		IN HWND hwndParent,
-		IN HWND hwndChild,
-		IN PUNICODE_STRING pstrClassName OPTIONAL,
-		IN PUNICODE_STRING pstrWindowName OPTIONAL,
-		IN DWORD dwType
-	)
-	{
-		typedef PVOID(NTAPI* MyUserFindWindowExProc)(
-			IN HWND hwndParent,
-			IN HWND hwndChild,
-			IN PUNICODE_STRING pstrClassName OPTIONAL,
-			IN PUNICODE_STRING pstrWindowName OPTIONAL,
-			IN DWORD dwType
-			);
-		MyUserFindWindowExProc proc = reinterpret_cast<MyUserFindWindowExProc>(GetNtUserFindWindowExAddress());
-		PVOID hwnd = proc(hwndParent, hwndChild, pstrClassName, pstrWindowName, dwType);
-
-		auto collection = GetGlobalVector();
-		auto cmp = [hwnd](uint64_t WindowsHandle) {return reinterpret_cast<uint64_t>(hwnd) == WindowsHandle; };
-		if (find_if(collection->begin(), collection->end(), cmp) != collection->end()) {
-			return NULL;
-		}
-		return hwnd;
-	}
-
-	void WindowProtected(
-		_In_ unsigned long SystemCallIndex,
-		_Inout_ void** SystemCallFunction
-	)
-	{
-		if (reinterpret_cast<uint64_t>(*SystemCallFunction) == GetZwUserGetForegroundWindowAddress()) {
-			*SystemCallFunction = NtUserGetForegroundWindow;
-		}
-		else if (reinterpret_cast<uint64_t>(*SystemCallFunction) == GetZwUserWindowFromPointAddress()) {
-			*SystemCallFunction = NtUserWindowFromPoint;
-		}
-		else if (reinterpret_cast<uint64_t>(*SystemCallFunction) == GetNtUserBuildHwndListAddress()) {
-			*SystemCallFunction = NtUserBuildHwndList;
-		}
-		else if (reinterpret_cast<uint64_t>(*SystemCallFunction) == GetNtUserQueryWindowAddress()) {
-			*SystemCallFunction = NtUserQueryWindow;
-		}
-		else if (reinterpret_cast<uint64_t>(*SystemCallFunction) == GetNtUserFindWindowExAddress()) {
-			*SystemCallFunction = NtUserFindWindowEx;
-		}
-		_Unreferenced_parameter_(SystemCallIndex);
 	}
 };

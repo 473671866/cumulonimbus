@@ -126,16 +126,3 @@ typedef struct _KLDR_DATA_TABLE_ENTRY {
 } KLDR_DATA_TABLE_ENTRY, * PKLDR_DATA_TABLE_ENTRY;
 
 NTSTATUS ZwQuerySystemInformation(SYSTEM_INFORMATION_CLASS SystemInformationClass, void* SystemInformation, ULONG SystemInformationLength, ULONG* ReturnLength);
-
-NTKERNELAPI
-NTSTATUS
-MmCreateSection(
-	__deref_out PVOID* SectionObject,
-	__in ACCESS_MASK DesiredAccess,
-	__in_opt POBJECT_ATTRIBUTES ObjectAttributes,
-	__in PLARGE_INTEGER InputMaximumSize,
-	__in ULONG SectionPageProtection,
-	__in ULONG AllocationAttributes,
-	__in_opt HANDLE FileHandle,
-	__in_opt PFILE_OBJECT FileObject
-);

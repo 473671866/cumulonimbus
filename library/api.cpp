@@ -6,7 +6,6 @@
 #include "loader.h"
 #include "profile.h"
 #include "spoce_exit.hpp"
-
 #include "load.hpp"
 #include "driver.hpp"
 
@@ -32,7 +31,7 @@ bool Examine()
 	return code == 0x77777 ? 0 : 1;
 }
 
-int Launcher()
+bool Launcher()
 {
 #ifdef NDEBUG
 	if (!Initialization(29834, 1, "xt0w4pimxxufygztaw", "1+3+4+", 0)) {
@@ -51,40 +50,39 @@ int Launcher()
 	}
 #endif
 
-	if (Examine() == 0) {
-		return 0;
+	if (Examine()) {
+		return true;
 	}
 
-	int result = 0;
 	char temppath[MAX_PATH]{};
 	GetTempPathA(MAX_PATH, temppath);
-	std::string filename = loader::RandomString(10);
-	std::filesystem::path driverpath(std::string(temppath).append(filename).append(".sys"));
-	std::string service_name = loader::RandomString(10);
+	std::filesystem::path driverpath(std::string(temppath).append(loader::RandomString(10)).append(".sys"));
 	bool success = loader::GenerateDriver(driverpath, load, sizeof(load));
 	if (!success) {
-		result = GetLastError();
-		goto unload;
+		printf("generate failed\n");
+		return false;
 	}
 
+	std::string service_name = loader::RandomString(10);
 	success = loader::LoadDriver(driverpath, service_name);
 	if (!success) {
-		result = GetLastError();
-		goto unload;
+		printf("error: %d\n", GetLastError());
+		return false;
 	}
+
+	auto unload_driver = std::experimental::make_scope_exit([&] {
+		loader::UnLoadDriver(service_name);
+		if (std::filesystem::exists(driverpath)) {
+			std::filesystem::remove(driverpath);
+		}});
 
 	success = loader::MappingDriver(driver, sizeof(driver));
 	if (!success) {
-		result = GetLastError();
-		goto unload;
+		printf("error: %d\n", GetLastError());
+		return false;
 	}
 
-unload:
-	loader::UnLoadDriver(service_name);
-	if (std::filesystem::exists(driverpath)) {
-		std::filesystem::remove(driverpath);
-	}
-	return result == 0 ? Examine() : result;
+	return Examine();
 }
 
 bool RemoteCall(unsigned __int64 pid, void* shellcode, unsigned __int64 size)
@@ -95,17 +93,20 @@ bool RemoteCall(unsigned __int64 pid, void* shellcode, unsigned __int64 size)
 
 bool LoadLibrary_x64(unsigned __int64 pid, const char* filepath)
 {
+	//判断当前文件是否存在
 	std::filesystem::path file_path(filepath);
 	if (!std::filesystem::exists(file_path)) {
 		return false;
 	}
 
+	//打开文件
 	std::ifstream stream(file_path, std::ios::binary);
 	auto stream_close = std::experimental::make_scope_exit([&] {stream.close(); });
 	if (!stream.is_open()) {
 		return false;
 	}
 
+	//读取文件
 	auto filesize = std::filesystem::file_size(file_path);
 	unsigned char* filebuffer = new unsigned char[filesize];
 	auto delete_filebuffer = std::experimental::make_scope_exit([filebuffer] {delete[] filebuffer; });
@@ -114,11 +115,13 @@ bool LoadLibrary_x64(unsigned __int64 pid, const char* filepath)
 		return false;
 	}
 
+	//不是pe文件
 	PIMAGE_DOS_HEADER dos_headers = reinterpret_cast<PIMAGE_DOS_HEADER>(filebuffer);
 	if (dos_headers->e_magic != IMAGE_DOS_SIGNATURE) {
 		return false;
 	}
 
+	//不是64位文件
 	PIMAGE_NT_HEADERS nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS>(dos_headers->e_lfanew + filebuffer);
 	if (nt_headers->Signature != IMAGE_NT_SIGNATURE || nt_headers->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
 		return false;
@@ -130,17 +133,20 @@ bool LoadLibrary_x64(unsigned __int64 pid, const char* filepath)
 
 bool LoadLibrary_x86(unsigned __int64 pid, const char* filepath)
 {
+	//文件是否存在
 	std::filesystem::path file_path(filepath);
 	if (!std::filesystem::exists(file_path)) {
 		return false;
 	}
 
+	//打开文件
 	std::ifstream stream(file_path, std::ios::binary);
 	auto stream_close = std::experimental::make_scope_exit([&] {stream.close(); });
 	if (!stream.is_open()) {
 		return false;
 	}
 
+	//读取文件
 	auto filesize = std::filesystem::file_size(file_path);
 	unsigned char* filebuffer = new unsigned char[filesize];
 	auto delete_filebuffer = std::experimental::make_scope_exit([filebuffer] {delete[] filebuffer; });
@@ -149,11 +155,13 @@ bool LoadLibrary_x86(unsigned __int64 pid, const char* filepath)
 		return false;
 	}
 
+	//不是pe文件
 	auto dos_headers = reinterpret_cast<PIMAGE_DOS_HEADER>(filebuffer);
 	if (dos_headers->e_magic != IMAGE_DOS_SIGNATURE) {
 		return false;
 	}
 
+	//不是32位的文件
 	auto nt_headers = reinterpret_cast<PIMAGE_NT_HEADERS>(dos_headers->e_lfanew + filebuffer);
 	if (nt_headers->Signature != IMAGE_NT_SIGNATURE || nt_headers->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
 		return false;

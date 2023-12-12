@@ -85,41 +85,11 @@ extern "C"
 #include <set>
 #endif
 
-#define INOUT
-#ifdef ALLOC_PRAGMA
-#define ALLOC_TEXT(Section, Name) __pragma(alloc_text(Section, Name))
-#else
-#define ALLOC_TEXT(Section, Name)
-#endif
-// _countof. You do not want to type RTL_NUMBER_OF, do you?
-#ifndef _countof
-#define _countof(x)    RTL_NUMBER_OF(x)
-#endif
+#define  print(format, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, __VA_ARGS__)
 
-// Returns true when it is running on the x64 system.
-// inline bool IsX64() {
-// #ifdef _AMD64_
-// 	return true;
-// #else
-// 	return false;
-// #endif
-// }
-// Break point that works only when a debugger is attached.
-#ifndef DBG_BREAK
-#ifdef _ARM_
-// Nullify it since an ARM device never allow us to attach a debugger.
-#define DBG_BREAK()
-#else
-#define DBG_BREAK()               \
-  if (KD_DEBUGGER_NOT_PRESENT) {  \
-		  } else {                        \
-	__debugbreak();               \
-		  }                               \
-  reinterpret_cast<void *>(0)
-#endif
-#endif
+#define _kd_print(format, ...) KdPrintEx((DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, __VA_ARGS__))
 
-constexpr bool IsReleaseBuild() {
+constexpr bool _is_release_build() {
 #if defined(DBG)
 	return false;
 #else
@@ -127,7 +97,7 @@ constexpr bool IsReleaseBuild() {
 #endif
 }
 
-constexpr bool IsX64() {
+constexpr bool _is_x64() {
 #if defined(_AMD64_)
 	return true;
 #else
@@ -135,27 +105,30 @@ constexpr bool IsX64() {
 #endif
 }
 
-#define MAGIC_NTSTATUS     0x80070000
-#define STATUS_CUSTOM_STATUS(x) (MAGIC_NTSTATUS + x) //不出错误框
+#define _is_invalid(expression, returned)	\
+	if(expression){							\
+		return returned;					\
+	}										\
+
 //需要管理员处理才能工作 STATUS_DOWNGRADE_DETECTED
 //恶意软件通报 STATUS_VIRUS_INFECTED
+#define MAGIC_NTSTATUS     0x80070000
+#define STATUS_CUSTOM_STATUS(x) (MAGIC_NTSTATUS + x) //不出错误框
 
 #ifdef __cplusplus
 //一些类型定义
-#include "singleton.hpp"
-#include "kernel_stl.h"
 #include "stdcpp.h"
-#include "unique_resource.h"
+#include "kernel_stl.h"
+#include "singleton.hpp"
 #include "spcoe_exit.hpp"
-#include "log.h"
-#include "ia32.hpp"
-#include "../exapi.h"
-#include "../keapi.h"
-#include "../mmapi.h"
-#include "../ntapi.h"
-#include "../obapi.h"
-#include "../psapi.h"
-#include "../rtlapi.h"
-#include "../zwapi.h"
-#include "../ntdef.h"
+#include "unique_resource.h"
+#include "../define/exapi.h"
+#include "../define/keapi.h"
+#include "../define/mmapi.h"
+#include "../define/ntapi.h"
+#include "../define/obapi.h"
+#include "../define/psapi.h"
+#include "../define/rtlapi.h"
+#include "../define/zwapi.h"
+#include "../define/ntdef.h"
 #endif

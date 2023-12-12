@@ -1,6 +1,5 @@
 #include "comm.h"
-#include "pdb/analysis.h"
-#include "utils/utils.h"
+#include "utils/memory.hpp"
 
 namespace comm
 {
@@ -13,7 +12,7 @@ namespace comm
 		VOID* Mutant;                                                           //0x8
 	}PEB, * PPEB;
 
-	VOID Dispather(
+	VOID dispather(
 		IN PVOID CallbackContext,
 		IN PVOID Argument1,
 		IN PVOID Argument2
@@ -26,8 +25,8 @@ namespace comm
 		KIRQL irql = KeGetCurrentIrql();
 		KeLowerIrql(PASSIVE_LEVEL);
 		PPEB peb = reinterpret_cast<PPEB>(PsGetProcessPeb(PsGetCurrentProcess()));
-		auto package = reinterpret_cast<CommPackage*>(peb->Mutant);
-		bool success = utils::ProbeUserAddress(package, sizeof(CommPackage), 1);
+		auto package = reinterpret_cast<stream*>(peb->Mutant);
+		bool success = utils::memory::probe(package, sizeof(stream), 1);
 		if (success && g_callback) {
 			if (package->flags == 0x55555) {
 				package->result = g_callback(package);
@@ -51,7 +50,7 @@ namespace comm
 			return status;
 		}
 
-		g_comm_handle = ExRegisterCallback(callback_object, Dispather, NULL);
+		g_comm_handle = ExRegisterCallback(callback_object, dispather, NULL);
 		if (g_comm_handle == nullptr) {
 			status = STATUS_UNSUCCESSFUL;
 		}

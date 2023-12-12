@@ -26,21 +26,18 @@
     <Filter Include="standrad">
       <UniqueIdentifier>{8b139e75-af42-4319-8293-e60a7065b3cb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="pdb">
-      <UniqueIdentifier>{e66d577f-ede8-4052-9f5a-13d485308545}</UniqueIdentifier>
-    </Filter>
     <Filter Include="capstone">
       <UniqueIdentifier>{2fda5a5d-5d8f-4e90-b151-0470e2b829ac}</UniqueIdentifier>
     </Filter>
-    <Filter Include="InfinityHook">
-      <UniqueIdentifier>{f02470eb-be1f-41e0-bd3f-3b3af12b889b}</UniqueIdentifier>
+    <Filter Include="define">
+      <UniqueIdentifier>{868697cd-6d64-41de-8633-e6605801efaf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="pdb">
+      <UniqueIdentifier>{29a3ef9c-9d11-433d-ab35-fe3c7da96323}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="standard\kernel_stl.cpp">
-      <Filter>standrad</Filter>
-    </ClCompile>
-    <ClCompile Include="standard\log.cpp">
       <Filter>standrad</Filter>
     </ClCompile>
     <ClCompile Include="standard\stdcpp.cpp">
@@ -61,22 +58,10 @@
     <ClCompile Include="comm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="utils\utils.cpp">
-      <Filter>utils</Filter>
-    </ClCompile>
-    <ClCompile Include="global.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="InfinityHook\hook.cpp">
-      <Filter>InfinityHook</Filter>
-    </ClCompile>
-    <ClCompile Include="utils\search.cpp">
-      <Filter>utils</Filter>
-    </ClCompile>
     <ClCompile Include="business.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="routine.cpp">
+    <ClCompile Include="implements.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -85,9 +70,6 @@
       <Filter>utils</Filter>
     </ClInclude>
     <ClInclude Include="utils\memory.hpp">
-      <Filter>utils</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\utils.h">
       <Filter>utils</Filter>
     </ClInclude>
     <ClInclude Include="utils\table.hpp">
@@ -105,22 +87,7 @@
     <ClInclude Include="standard\spcoe_exit.hpp">
       <Filter>standrad</Filter>
     </ClInclude>
-    <ClInclude Include="standard\ia32.h">
-      <Filter>standrad</Filter>
-    </ClInclude>
-    <ClInclude Include="standard\ia32.hpp">
-      <Filter>standrad</Filter>
-    </ClInclude>
-    <ClInclude Include="standard\ia32_compact.h">
-      <Filter>standrad</Filter>
-    </ClInclude>
-    <ClInclude Include="standard\ia32_defines_only.h">
-      <Filter>standrad</Filter>
-    </ClInclude>
     <ClInclude Include="standard\kernel_stl.h">
-      <Filter>standrad</Filter>
-    </ClInclude>
-    <ClInclude Include="standard\log.h">
       <Filter>standrad</Filter>
     </ClInclude>
     <ClInclude Include="standard\singleton.hpp">
@@ -186,61 +153,61 @@
     <ClInclude Include="utils\MemLoadDll.h">
       <Filter>utils</Filter>
     </ClInclude>
-    <ClInclude Include="pdb\analysis.h">
-      <Filter>pdb</Filter>
-    </ClInclude>
-    <ClInclude Include="global.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="zwapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="psapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ntapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ntdef.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mmapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="keapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="obapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="exapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="rtlapi.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="C:\Users\47367\Downloads\InfinityHookPro-main\infinity_hook_pro\infinity_hook_pro\utils.hpp">
-      <Filter>InfinityHook</Filter>
-    </ClInclude>
-    <ClInclude Include="InfinityHook\headers.hpp">
-      <Filter>InfinityHook</Filter>
-    </ClInclude>
-    <ClInclude Include="InfinityHook\hook.h">
-      <Filter>InfinityHook</Filter>
-    </ClInclude>
-    <ClInclude Include="InfinityHook\hook.hpp">
-      <Filter>InfinityHook</Filter>
-    </ClInclude>
-    <ClInclude Include="InfinityHook\imports.hpp">
-      <Filter>InfinityHook</Filter>
-    </ClInclude>
-    <ClInclude Include="utils\search.h">
+    <ClInclude Include="utils\search.hpp">
       <Filter>utils</Filter>
     </ClInclude>
     <ClInclude Include="business.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="routine.h">
+    <ClInclude Include="define\rtlapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\zwapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\exapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\keapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\mmapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\ntapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\ntdef.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\obapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\psapi.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\parser.hpp">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\page.hpp">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\library.hpp">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="define\ia32.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\ia32.hpp">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\ia32_compact.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="define\ia32_defines_only.h">
+      <Filter>define</Filter>
+    </ClInclude>
+    <ClInclude Include="implements.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -251,16 +218,10 @@
     <None Include="capstone\capstone_static_winkernel.pdb">
       <Filter>capstone</Filter>
     </None>
-    <None Include="pdb\analysis_pdb.pdb">
-      <Filter>pdb</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Library Include="capstone\capstone_static_winkernel.lib">
       <Filter>capstone</Filter>
-    </Library>
-    <Library Include="pdb\analysis_pdb.lib">
-      <Filter>pdb</Filter>
     </Library>
   </ItemGroup>
 </Project>

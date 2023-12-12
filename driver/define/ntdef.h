@@ -289,8 +289,6 @@ typedef struct _MMPFN
 }MMPFN;
 static_assert(sizeof(MMPFN) == 0x30, "Size check");
 
-typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY RUNTIME_FUNCTION, * PRUNTIME_FUNCTION;
-
 //0x70 bytes (sizeof)
 typedef struct _FLOATING_SAVE_AREA
 {

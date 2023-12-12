@@ -1,74 +1,70 @@
 #pragma once
-#include "../Standard/base.h"
-#include "../pdb/analysis.h"
-#include "utils.h"
+#include "../standard/base.h"
 
-struct ServiceDescriptorTable
-{
-	PULONG ServiceTable;
-	PVOID CounterTable;
-	ULONGLONG NumberOfServices;
-	PCHAR ArgumentTable;
-};
+namespace utils {
+	struct ServiceDescriptorTable {
+		PULONG ServiceTable;
+		PVOID CounterTable;
+		ULONGLONG NumberOfServices;
+		PCHAR ArgumentTable;
+	};
 
-class ServiceTableUtils :public Singleton<ServiceTableUtils>
-{
-public:
-
-	ServiceTableUtils()
-	{
-		auto ntos = analysis::Ntoskrnl();
-		this->m_service_table = reinterpret_cast<ServiceDescriptorTable*>(ntos->GetPointer("KeServiceDescriptorTable"));
-		this->m_service_table_shadow = reinterpret_cast<ServiceDescriptorTable*>(ntos->GetPointer("KeServiceDescriptorTableShadow"));
-	}
-
-	/**
-	 * @brief 获取ssdt表函数
-	 * @param service_number 服务号
-	 * @return
-	*/
-	uint64_t GetServiceTableRoutine(uint32_t service_number)
-	{
-		LONG offset = this->m_service_table->ServiceTable[service_number];
-		offset >>= 4;
-
-		LARGE_INTEGER result{ NULL };
-		result.QuadPart = (ULONG64)this->m_service_table->ServiceTable;
-		result.LowPart += offset;
-
-		return result.QuadPart;
-	}
-
-	/**
-	 * @brief 获取sssdt表函数
-	 * @param service_number 服务号
-	 * @return
-	*/
-	uint64_t GetServiceTableShadowRoutine(uint32_t service_number)
-	{
-		if (service_number >= 0x1000) {
-			service_number -= 0x1000;
+	class service_table {
+	public:
+		service_table(void* service_table_address, void* service_table_shadow_address) {
+			//this->m_service_table = reinterpret_cast<ServiceDescriptorTable*>(ntos->GetPointer("KeServiceDescriptorTable"));
+			//this->m_service_table_shadow = reinterpret_cast<ServiceDescriptorTable*>(ntos->GetPointer("KeServiceDescriptorTableShadow"));
+			this->m_service_table = static_cast<ServiceDescriptorTable*>(service_table_address);
+			this->m_service_table_shadow = static_cast<ServiceDescriptorTable*>(service_table_shadow_address);
 		}
 
-		LARGE_INTEGER result{ NULL };
-		PEPROCESS process = nullptr;
-		KAPC_STATE apc{ NULL };
+		/**
+		 * @brief 获取ssdt表函数
+		 * @param service_number 服务号
+		 * @return
+		*/
+		template<typename _Ty>
+		_Ty GetServiceTableRoutine(unsigned __int32 service_number) {
+			if (!this->m_service_table) {
+				return 0;
+			}
 
-		if (NT_SUCCESS(utils::LookupProcessByImageFileName("explorer.exe", &process))) {
-			KeStackAttachProcess(process, &apc);
-
-			LONG offset = this->m_service_table_shadow->ServiceTable[service_number];
+			unsigned long offset = this->m_service_table->ServiceTable[service_number];
 			offset >>= 4;
-			result.QuadPart = (ULONG64)this->m_service_table_shadow->ServiceTable;
+
+			LARGE_INTEGER result{ NULL };
+			result.QuadPart = (unsigned __int64)this->m_service_table->ServiceTable;
 			result.LowPart += offset;
 
-			KeUnstackDetachProcess(&apc);
-			ObDereferenceObject(process);
+			return (_Ty)result.QuadPart;
 		}
-		return result.QuadPart;
-	}
 
-private:
-	ServiceDescriptorTable* m_service_table;
-	ServiceDescriptorTable* m_service_table_shadow;
-};
+		/**
+		 * @brief 获取sssdt表函数
+		 * @param service_number 服务号
+		 * @return
+		*/
+		template<typename _Ty>
+		_Ty GetServiceTableShadowRoutine(unsigned __int32 service_number) {
+			if (!this->m_service_table_shadow) {
+				return 0;
+			}
+
+			if (service_number >= 0x1000) {
+				service_number -= 0x1000;
+			}
+
+			LARGE_INTEGER result{ NULL };
+			unsigned long offset = this->m_service_table_shadow->ServiceTable[service_number];
+			offset >>= 4;
+			result.QuadPart = (unsigned __int64)this->m_service_table_shadow->ServiceTable;
+			result.LowPart += offset;
+
+			return (_Ty)result.QuadPart;
+		}
+
+	private:
+		ServiceDescriptorTable* m_service_table;
+		ServiceDescriptorTable* m_service_table_shadow;
+	};
+}

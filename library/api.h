@@ -17,7 +17,7 @@ bool Examine();
 
 /// @brief 加载驱动
 /// @return 错误码 0为成功
-int Launcher();
+bool Launcher();
 
 /// @brief 远程call
 /// @param pid 进程id
